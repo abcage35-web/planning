@@ -10,6 +10,7 @@
 - фильтры по каждой колонке;
 - сводка проблем (`Нет` по рекомендациям, ричу, видео, автоплею, тегам);
 - сохранение состояния в `localStorage` + облачная синхронизация через Cloudflare D1 (`/api/state`).
+- backend-авторизация через Cloudflare Pages Functions + D1 sessions (`/api/auth/*`).
 - плановое теневое обновление всех строк в `00:00` и `12:00` по Москве (источник `system` в истории).
 
 ## Запуск
@@ -25,22 +26,37 @@ python3 -m http.server 4173
 
 В проект добавлены:
 - API-функция: `functions/api/state.js` (`GET/PUT /api/state`);
+- API-функции авторизации: `functions/api/auth/login.js`, `functions/api/auth/me.js`, `functions/api/auth/logout.js`;
 - SQL-схема D1: `cloudflare/d1/schema.sql`.
 
 Чтобы данные не пропадали после очистки браузера:
 
 1. В Cloudflare создайте D1 базу (например `wb-dashboard-db`).
 2. Выполните SQL из `cloudflare/d1/schema.sql` в этой базе.
+   Важно: схема теперь включает таблицы `users` и `sessions`.
 3. В Pages-проекте откройте `Settings -> Functions -> D1 bindings`.
 4. Добавьте binding:
    - `Variable name`: `DB`
    - `D1 database`: ваша база `wb-dashboard-db`
-5. Убедитесь, что проект деплоится через Pages из GitHub (не Direct Upload).
-6. Сделайте `git push` и дождитесь нового деплоя.
+5. (Опционально) Добавьте переменные окружения:
+   - `AUTH_COOKIE_NAME` (по умолчанию `mp_session`);
+   - `SESSION_TTL_SECONDS` (по умолчанию 604800 = 7 дней).
+6. Убедитесь, что проект деплоится через Pages из GitHub (не Direct Upload).
+7. Сделайте `git push` и дождитесь нового деплоя.
 
 После этого приложение автоматически:
 - при старте пытается загрузить последнее состояние из D1;
 - при изменениях сохраняет state локально и отправляет его в D1.
+
+## Вход
+
+Предустановленные пользователи (создаются SQL-скриптом):
+- `user / user` (роль `user`);
+- `admin / admin 1` (роль `admin`).
+
+Разница прав:
+- `admin`: может добавлять и удалять товары;
+- `user`: не может добавлять и удалять товары.
 
 Локально (`python3 -m http.server`) API `/api/state` недоступен, поэтому работает fallback на `localStorage`.
 

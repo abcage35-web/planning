@@ -1,8 +1,9 @@
 const STORAGE_KEY = "wb-dashboard-v2";
-const AUTH_STORAGE_KEY = `${STORAGE_KEY}:auth-v1`;
-const AUTH_USERS = Object.freeze({
-  user: Object.freeze({ login: "user", password: "user", role: "user" }),
-  admin: Object.freeze({ login: "admin", password: "admin 1", role: "admin" }),
+const AUTH_FETCH_TIMEOUT_MS = 9000;
+const AUTH_ENDPOINTS = Object.freeze({
+  login: "/api/auth/login",
+  me: "/api/auth/me",
+  logout: "/api/auth/logout",
 });
 const BASKET_START = 1;
 const BASKET_END = 80;
@@ -345,8 +346,8 @@ const el = {
 init().catch(() => {});
 
 async function init() {
+  await restoreAuthState();
   await restoreState();
-  restoreAuthState();
   state.sellerSettings = normalizeSellerSettings(state.sellerSettings);
   state.colorVariantsCache = normalizeColorVariantCache(state.colorVariantsCache);
   hydrateStaticIcons();
@@ -435,65 +436,147 @@ function ensureAdminAccess(actionName = "Это действие") {
   return false;
 }
 
-function findAuthUserByCredentials(loginRaw, passwordRaw) {
-  const login = normalizeAuthLogin(loginRaw);
-  const password = String(passwordRaw || "").trim();
-  if (!login || !password) {
+function normalizeAuthUser(userRaw) {
+  if (!userRaw || typeof userRaw !== "object") {
     return null;
   }
 
-  const users = Object.values(AUTH_USERS);
-  for (const user of users) {
-    if (login === user.login && password === user.password) {
-      return user;
+  const login = normalizeAuthLogin(userRaw.login);
+  const role = normalizeAuthRole(userRaw.role);
+  if (!login || (role !== "admin" && role !== "user")) {
+    return null;
+  }
+
+  return { login, role };
+}
+
+function getAuthEndpointUrl(pathRaw) {
+  const path = String(pathRaw || "").trim();
+  const fallbackPath = AUTH_ENDPOINTS.me;
+  const endpoint = path || fallbackPath;
+  return new URL(endpoint, window.location.origin).toString();
+}
+
+async function runAuthRequest(path, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const bodyPayload = options.body && typeof options.body === "object" ? options.body : null;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), AUTH_FETCH_TIMEOUT_MS);
+
+  try {
+    const headers = {};
+    if (bodyPayload) {
+      headers["content-type"] = "application/json";
     }
-  }
 
-  return null;
+    const response = await fetch(getAuthEndpointUrl(path), {
+      method,
+      headers,
+      body: bodyPayload ? JSON.stringify(bodyPayload) : null,
+      credentials: "include",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    const data = await response.json().catch(() => null);
+    return {
+      ok: response.ok,
+      status: response.status,
+      data,
+    };
+  } catch {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
-function persistAuthState() {
-  const payload = {
-    isAuthenticated: isAuthenticated(),
-    role: normalizeAuthRole(state.auth?.role),
-    login: normalizeAuthLogin(state.auth?.login),
+function applyAuthenticatedUser(userRaw) {
+  const user = normalizeAuthUser(userRaw);
+  if (!user) {
+    state.auth = createGuestAuthState();
+    return false;
+  }
+
+  state.auth = {
+    isAuthenticated: true,
+    role: user.role,
+    login: user.login,
   };
-
-  try {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload));
-  } catch {
-    // noop
-  }
+  return true;
 }
 
-function restoreAuthState() {
-  let parsed = null;
-  try {
-    const raw = String(localStorage.getItem(AUTH_STORAGE_KEY) || "");
-    parsed = raw ? JSON.parse(raw) : null;
-  } catch {
-    parsed = null;
-  }
-
-  if (!parsed || typeof parsed !== "object") {
+async function restoreAuthState() {
+  const response = await runAuthRequest(AUTH_ENDPOINTS.me, { method: "GET" });
+  if (!response.ok) {
     state.auth = createGuestAuthState();
     return;
   }
 
-  const role = normalizeAuthRole(parsed.role);
-  const login = normalizeAuthLogin(parsed.login);
-  const hasKnownUser = Object.values(AUTH_USERS).some((user) => user.login === login && user.role === role);
+  const payload = response.data && typeof response.data === "object" ? response.data : null;
+  const user = payload?.user;
+  if (!applyAuthenticatedUser(user)) {
+    state.auth = createGuestAuthState();
+  }
+}
 
-  if (parsed.isAuthenticated === true && hasKnownUser) {
-    state.auth = {
-      isAuthenticated: true,
-      role,
-      login,
-    };
+async function syncStateAfterAuth() {
+  await restoreState();
+  state.sellerSettings = normalizeSellerSettings(state.sellerSettings);
+  state.colorVariantsCache = normalizeColorVariantCache(state.colorVariantsCache);
+  renderCabinetFilterOptions();
+  renderFilterInputs();
+  applyAutoplayLimitControl();
+  applyTagsLimitControl();
+  applyRowsLimitControl();
+  render();
+}
+
+function getAuthErrorMessage(response, fallback) {
+  const payload = response?.data;
+  const errorText = payload && typeof payload === "object" ? String(payload.error || "").trim() : "";
+  return errorText || fallback;
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const login = normalizeAuthLogin(el.authLoginInput?.value);
+  const password = String(el.authPasswordInput?.value || "").trim();
+
+  if (!login || !password) {
+    window.alert("Введите логин и пароль.");
     return;
   }
 
-  state.auth = createGuestAuthState();
+  const response = await runAuthRequest(AUTH_ENDPOINTS.login, {
+    method: "POST",
+    body: { login, password },
+  });
+
+  if (!response.ok) {
+    window.alert(getAuthErrorMessage(response, "Неверный логин или пароль."));
+    if (el.authPasswordInput) {
+      el.authPasswordInput.value = "";
+      el.authPasswordInput.focus();
+    }
+    return;
+  }
+
+  const user = response.data && typeof response.data === "object" ? response.data.user : null;
+  if (!applyAuthenticatedUser(user)) {
+    window.alert("Не удалось определить пользователя после входа.");
+    return;
+  }
+
+  if (el.authPasswordInput) {
+    el.authPasswordInput.value = "";
+  }
+  applyAuthState({ focusLogin: false });
+  await syncStateAfterAuth();
 }
 
 function getAuthRoleLabel() {
@@ -561,39 +644,21 @@ function applyAuthState(options = {}) {
   }
 }
 
-function handleAuthSubmit(event) {
-  event.preventDefault();
-  const login = normalizeAuthLogin(el.authLoginInput?.value);
-  const password = String(el.authPasswordInput?.value || "").trim();
-  const user = findAuthUserByCredentials(login, password);
-
-  if (!user) {
-    window.alert("Неверный логин или пароль.");
-    if (el.authPasswordInput) {
-      el.authPasswordInput.value = "";
-      el.authPasswordInput.focus();
-    }
-    return;
-  }
-
-  state.auth = {
-    isAuthenticated: true,
-    role: user.role,
-    login: user.login,
-  };
-
-  persistAuthState();
-  if (el.authPasswordInput) {
-    el.authPasswordInput.value = "";
-  }
-  applyAuthState({ focusLogin: false });
+async function handleLogout() {
+  await runAuthRequest(AUTH_ENDPOINTS.logout, { method: "POST" });
+  state.auth = createGuestAuthState();
+  applyAuthState({ focusLogin: true });
   render();
 }
 
-function handleLogout() {
+function handleAuthRequired() {
+  if (!isAuthenticated()) {
+    return;
+  }
   state.auth = createGuestAuthState();
-  persistAuthState();
   applyAuthState({ focusLogin: true });
+  render();
+  window.alert("Сессия истекла. Выполните вход снова.");
 }
 
 function bindEvents() {
@@ -603,6 +668,7 @@ function bindEvents() {
   if (el.logoutBtn) {
     el.logoutBtn.addEventListener("click", handleLogout);
   }
+  window.addEventListener("wb-auth-required", handleAuthRequired);
 
   if (el.addSingleBtn) {
     el.addSingleBtn.addEventListener("click", handleAddSingle);

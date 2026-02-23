@@ -1855,6 +1855,7 @@ async function fetchJsonMaybe(url, options = {}, config = {}) {
     if (!response.ok) {
       return {
         ok: false,
+        status: response.status,
         message: httpStatusErrorMessage(response.status),
       };
     }
@@ -1863,6 +1864,7 @@ async function fetchJsonMaybe(url, options = {}, config = {}) {
       const data = JSON.parse(text);
       return {
         ok: true,
+        status: response.status,
         data,
       };
     } catch {

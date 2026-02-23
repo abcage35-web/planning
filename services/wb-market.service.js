@@ -1,5 +1,19 @@
 (function initWBMarketService(global) {
   const MARKET_BACKEND_ENDPOINT = "/api/wb-market";
+  let lastAuthEventAt = 0;
+
+  function notifyAuthRequired() {
+    const now = Date.now();
+    if (lastAuthEventAt && now - lastAuthEventAt < 3000) {
+      return;
+    }
+    lastAuthEventAt = now;
+    try {
+      window.dispatchEvent(new CustomEvent("wb-auth-required"));
+    } catch {
+      // noop
+    }
+  }
 
   function createEmptyMarketSnapshot() {
     return {
@@ -336,6 +350,15 @@
     let response = await fetchJsonMaybe(endpoint, { signal: requestSignal }, fastConfig);
     if (!(response.ok && response.data && response.data.ok === true)) {
       response = await fetchJsonMaybe(endpoint, { signal: requestSignal }, reconnectConfig);
+    }
+
+    const unauthorized =
+      Number(response?.status) === 401 ||
+      String(response?.data?.error || "")
+        .trim()
+        .toLowerCase() === "unauthorized";
+    if (unauthorized) {
+      notifyAuthRequired();
     }
 
     const snapshot = normalizeMarketSnapshotFromBackend(response.data);

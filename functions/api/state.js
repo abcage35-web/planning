@@ -1,37 +1,11 @@
+import { getSessionFromRequest, json } from "./_lib/auth.js";
+
 const DEFAULT_STATE_KEY = "wb-dashboard-v2";
 const MAX_PAYLOAD_BYTES = 1024 * 1024;
-
-function json(data, init = {}) {
-  const headers = new Headers(init.headers || {});
-  headers.set("content-type", "application/json; charset=utf-8");
-  headers.set("cache-control", "no-store");
-  return new Response(JSON.stringify(data), { ...init, headers });
-}
 
 function getStateKeyFromUrl(url) {
   const key = String(url.searchParams.get("key") || "").trim();
   return key || DEFAULT_STATE_KEY;
-}
-
-function isAuthorized(request, env) {
-  const expected = String(env?.API_TOKEN || "").trim();
-  if (!expected) {
-    return true;
-  }
-
-  const auth = String(request.headers.get("authorization") || "");
-  if (!auth.startsWith("Bearer ")) {
-    return false;
-  }
-  const provided = auth.slice("Bearer ".length).trim();
-  return provided === expected;
-}
-
-function guardAuthorization(request, env) {
-  if (isAuthorized(request, env)) {
-    return null;
-  }
-  return json({ ok: false, error: "Unauthorized" }, { status: 401 });
 }
 
 function parsePayloadSize(payload) {
@@ -44,26 +18,17 @@ function parsePayloadSize(payload) {
 }
 
 export async function onRequestOptions() {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      "access-control-allow-origin": "*",
-      "access-control-allow-methods": "GET,PUT,OPTIONS",
-      "access-control-allow-headers": "content-type,authorization",
-      "access-control-max-age": "86400",
-    },
-  });
+  return new Response(null, { status: 204 });
 }
 
 export async function onRequestGet(context) {
-  const authError = guardAuthorization(context.request, context.env);
-  if (authError) {
-    return authError;
-  }
-
   const { env, request } = context;
   if (!env?.DB) {
     return json({ ok: false, error: "D1 binding DB is not configured" }, { status: 500 });
+  }
+  const session = await getSessionFromRequest(request, env);
+  if (!session) {
+    return json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const url = new URL(request.url);
@@ -99,14 +64,13 @@ export async function onRequestGet(context) {
 }
 
 export async function onRequestPut(context) {
-  const authError = guardAuthorization(context.request, context.env);
-  if (authError) {
-    return authError;
-  }
-
   const { env, request } = context;
   if (!env?.DB) {
     return json({ ok: false, error: "D1 binding DB is not configured" }, { status: 500 });
+  }
+  const session = await getSessionFromRequest(request, env);
+  if (!session) {
+    return json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   let body;

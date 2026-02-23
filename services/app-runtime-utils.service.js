@@ -900,7 +900,8 @@ function resetStateToDefaults() {
 function persistState() {
   const payload = buildStatePayload();
   persistStateLocalPayload(payload);
-  if (typeof queueCloudStateSync === "function") {
+  const canUseCloudSync = typeof isAuthenticated === "function" ? isAuthenticated() : true;
+  if (canUseCloudSync && typeof queueCloudStateSync === "function") {
     queueCloudStateSync(payload);
   }
 }
@@ -909,8 +910,9 @@ async function restoreState() {
   const localPayload = readLocalStatePayload();
   let remotePayload = null;
   const shadowPendingPayload = readShadowPendingPayload();
+  const canUseCloudSync = typeof isAuthenticated === "function" ? isAuthenticated() : true;
 
-  if (typeof loadCloudStatePayload === "function") {
+  if (canUseCloudSync && typeof loadCloudStatePayload === "function") {
     try {
       remotePayload = await loadCloudStatePayload();
     } catch {
@@ -933,12 +935,12 @@ async function restoreState() {
   if (payload === shadowPendingPayload) {
     clearShadowPendingPayload();
     persistStateLocalPayload(payload);
-    if (typeof queueCloudStateSync === "function") {
+    if (canUseCloudSync && typeof queueCloudStateSync === "function") {
       queueCloudStateSync(payload);
     }
   } else if (payload === remotePayload) {
     persistStateLocalPayload(payload);
-  } else if (payload === localPayload && typeof queueCloudStateSync === "function") {
+  } else if (payload === localPayload && canUseCloudSync && typeof queueCloudStateSync === "function") {
     const localMs = getStatePayloadSavedAtMs(localPayload);
     const remoteMs = getStatePayloadSavedAtMs(remotePayload);
     if (!remotePayload || localMs >= remoteMs) {

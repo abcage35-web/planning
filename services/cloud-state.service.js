@@ -9,6 +9,7 @@ const cloudStateSync = {
   pending: false,
   latestPayload: null,
   lastErrorAt: 0,
+  lastAuthErrorAt: 0,
 };
 
 function getCloudStateKey() {
@@ -25,22 +26,11 @@ function isCloudStateDisabled() {
   return window.WB_DASHBOARD_DISABLE_CLOUD_STATE === true;
 }
 
-function getCloudStateToken() {
-  return String(window.WB_DASHBOARD_API_TOKEN || "").trim();
-}
-
 function getCloudStateHeaders(base = {}) {
-  const headers = {
+  return {
     "content-type": "application/json",
     ...base,
   };
-
-  const token = getCloudStateToken();
-  if (token) {
-    headers.authorization = `Bearer ${token}`;
-  }
-
-  return headers;
 }
 
 function buildCloudStateUrl() {
@@ -81,8 +71,23 @@ async function runCloudStateRequest(method, body = null) {
       method,
       headers: getCloudStateHeaders(),
       body: body ? JSON.stringify(body) : null,
+      credentials: "include",
+      cache: "no-store",
       signal: controller.signal,
     });
+
+    if (response.status === 401) {
+      const now = Date.now();
+      if (!cloudStateSync.lastAuthErrorAt || now - cloudStateSync.lastAuthErrorAt >= 3000) {
+        cloudStateSync.lastAuthErrorAt = now;
+        try {
+          window.dispatchEvent(new CustomEvent("wb-auth-required"));
+        } catch {
+          // noop
+        }
+      }
+      return null;
+    }
 
     if (!response.ok) {
       return null;

@@ -1,3 +1,5 @@
+import { getSessionFromRequest, json } from "./_lib/auth.js";
+
 const CARD_V4_APP_TYPE = "1";
 const CARD_V4_CURR = "rub";
 const CARD_V4_DEST = "-1257786";
@@ -6,24 +8,6 @@ const CARD_V4_ATTEMPTS = 4;
 const CARD_V4_TIMEOUT_MS = 5000;
 const RETRY_BASE_DELAY_MS = 180;
 const RETRY_MAX_DELAY_MS = 1400;
-
-function withCors(headersRaw = {}) {
-  return {
-    "access-control-allow-origin": "*",
-    "access-control-allow-methods": "GET,OPTIONS",
-    "access-control-allow-headers": "content-type,authorization",
-    "cache-control": "no-store",
-    ...headersRaw,
-  };
-}
-
-function json(data, init = {}) {
-  const headers = withCors({
-    "content-type": "application/json; charset=utf-8",
-    ...(init.headers || {}),
-  });
-  return new Response(JSON.stringify(data), { ...init, headers });
-}
 
 function toPositiveInteger(valueRaw) {
   if (typeof valueRaw === "number" && Number.isInteger(valueRaw) && valueRaw > 0) {
@@ -386,13 +370,19 @@ function getMissingMarketFields(snapshot) {
 }
 
 export async function onRequestOptions() {
-  return new Response(null, {
-    status: 204,
-    headers: withCors(),
-  });
+  return new Response(null, { status: 204 });
 }
 
 export async function onRequestGet(context) {
+  if (!context?.env?.DB) {
+    return json({ ok: false, error: "D1 binding DB is not configured" }, { status: 500 });
+  }
+
+  const session = await getSessionFromRequest(context.request, context.env);
+  if (!session) {
+    return json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   const url = new URL(context.request.url);
   const nmId = toPositiveInteger(url.searchParams.get("nm"));
   if (!Number.isInteger(nmId) || nmId <= 0) {
