@@ -24,10 +24,14 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user_id
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at
   ON sessions(expires_at);
 
-INSERT OR IGNORE INTO users (login, password_hash, role, is_active, created_at)
+INSERT INTO users (login, password_hash, role, is_active, created_at)
 VALUES
   ('user', 'pbkdf2_sha256$210000$Xyk2VrY4qRGg4fnlg2fBCw==$8P22oGccoWWA7nyD2nujjFuuToxvWwpwO3o6kwe1nB8=', 'user', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  ('admin', 'pbkdf2_sha256$210000$akVRZ3qknVvEJ0HIbtvqhg==$GpxkvT/Wb9m4nGTFBw4wxkEc+rw9gTFHMEyqxh3nFPw=', 'admin', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+  ('admin', 'pbkdf2_sha256$210000$akVRZ3qknVvEJ0HIbtvqhg==$GpxkvT/Wb9m4nGTFBw4wxkEc+rw9gTFHMEyqxh3nFPw=', 'admin', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+ON CONFLICT(login) DO UPDATE SET
+  password_hash = excluded.password_hash,
+  role = excluded.role,
+  is_active = excluded.is_active;
 
 CREATE TABLE IF NOT EXISTS dashboard_state (
   state_key TEXT PRIMARY KEY,
