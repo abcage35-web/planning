@@ -211,18 +211,22 @@ body {
 .auth-logout-btn {
   min-width: 32px;
   width: 32px;
-  height: 30px;
-  min-height: 30px;
+  height: 24px;
+  min-height: 24px;
   padding: 0;
   border-radius: 12px;
   color: #32505f;
   border-color: rgba(40, 67, 81, 0.26);
   background: rgba(255, 255, 255, 0.94);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
 }
 
 .auth-logout-btn .ui-icon {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   stroke-width: 2.2;
 }
 
@@ -238,6 +242,15 @@ body {
 
 .auth-logout-btn:active {
   background: rgba(191, 62, 44, 0.2);
+}
+
+.global-filters-head-actions .auth-logout-btn {
+  min-height: 24px;
+  height: 24px;
+  min-width: 32px;
+  width: 32px;
+  padding: 0;
+  justify-content: center;
 }
 
 .auth-gate {
