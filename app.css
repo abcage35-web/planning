@@ -173,9 +173,9 @@ body {
 .auth-status {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-height: var(--global-head-control-height);
-  padding: 0 6px 0 10px;
+  padding: 4px 7px 4px 10px;
   border-radius: 999px;
   border: 1px solid rgba(22, 58, 73, 0.2);
   background: rgba(237, 245, 248, 0.88);
@@ -206,6 +206,37 @@ body {
 .auth-user-label {
   font: 600 12px/1 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   color: #375564;
+}
+
+.auth-logout-btn {
+  min-width: 34px;
+  width: 34px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 10px;
+  color: #32505f;
+  border-color: rgba(40, 67, 81, 0.26);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.auth-logout-btn .ui-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.auth-logout-btn .btn-label {
+  display: none;
+}
+
+.auth-logout-btn:hover {
+  color: #9f2b1f;
+  border-color: rgba(191, 62, 44, 0.68);
+  background: rgba(191, 62, 44, 0.14);
+}
+
+.auth-logout-btn:active {
+  background: rgba(191, 62, 44, 0.2);
 }
 
 .auth-gate {
@@ -325,8 +356,8 @@ body {
 
 @media (max-width: 980px) {
   .auth-status {
-    width: 100%;
-    justify-content: space-between;
+    width: auto;
+    justify-content: flex-start;
     padding-right: 8px;
   }
 }
@@ -2787,6 +2818,27 @@ tbody tr:hover {
   align-items: center;
 }
 
+.actions-updated-at {
+  margin-top: 3px;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  min-height: 22px;
+  width: 100%;
+  color: #496170;
+  font: 600 8px/1 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.actions-updated-date,
+.actions-updated-time {
+  display: block;
+  white-space: nowrap;
+}
+
+.actions-updated-at-empty {
+  opacity: 0.55;
+}
+
 .actions-divider {
   width: 22px;
   height: 1px;
@@ -4303,6 +4355,17 @@ tbody tr:hover {
 }
 
 @media (max-width: 980px) {
+  .table-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-wrap > table {
+    min-width: 1320px;
+    width: 1320px;
+  }
+
   .color-variants-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -4317,13 +4380,50 @@ tbody tr:hover {
     padding: 10px;
   }
 
+  .app-shell {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .panel {
+    min-width: 0;
+  }
+
   h1 {
     font-size: 29px;
   }
 
   .global-filters-frame {
-    top: 6px;
+    position: static;
+    top: auto;
+    z-index: 2;
+    margin-top: 0;
     padding: 8px;
+  }
+
+  .global-filters-head {
+    gap: 8px;
+  }
+
+  .global-filters-head-actions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .global-filters-summary {
+    width: 100%;
+  }
+
+  .global-filters-summary-chip {
+    flex: 1 1 calc(50% - 8px);
+    justify-content: space-between;
+  }
+
+  .global-filters-body {
+    max-height: 58vh;
+    overflow-y: auto;
+    padding-right: 2px;
   }
 
   .global-columns-filters {
@@ -4457,6 +4557,7 @@ tbody tr:hover {
 
   .table-panel {
     padding: 8px;
+    overflow: hidden;
   }
 
   .table-tools {
@@ -4489,8 +4590,21 @@ tbody tr:hover {
     padding: 5px;
   }
 
+  .col-actions {
+    width: 72px;
+  }
+
+  .table-wrap > table {
+    min-width: 1460px;
+    width: 1460px;
+  }
+
+  .actions-updated-at {
+    font-size: 8px;
+  }
+
   .listing-cell {
-    height: 160px;
+    height: 176px;
   }
 
   .slides-wrap {

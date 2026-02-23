@@ -155,6 +155,9 @@ const ICON_LIBRARY = {
   chartLine: {
     paths: ["M3 3v18h18", "m7 14 4-4 3 3 4-6"],
   },
+  logOut: {
+    paths: ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "m16 17 5-5-5-5", "M21 12H9"],
+  },
 };
 
 const state = {
@@ -390,6 +393,7 @@ function hydrateStaticIcons() {
   setStaticButtonIcon(el.pageNextBtn, "chevronRight");
   setStaticButtonIcon(el.previewPrevBtn, "chevronLeft");
   setStaticButtonIcon(el.previewNextBtn, "chevronRight");
+  setStaticButtonIcon(el.logoutBtn, "logOut");
 }
 
 function createGuestAuthState() {
@@ -587,6 +591,7 @@ function applyRoleAccessState() {
   const canManageRows = hasAdminAccess();
   const bulkField = el.bulkInput ? el.bulkInput.closest(".field") : null;
   const singleField = el.singleInput ? el.singleInput.closest(".field") : null;
+  const controlsSubtle = el.controlsPanel ? el.controlsPanel.querySelector(".controls-subtle") : null;
 
   if (bulkField) {
     bulkField.hidden = !canManageRows;
@@ -612,6 +617,16 @@ function applyRoleAccessState() {
   if (el.clearBtn) {
     el.clearBtn.hidden = !canManageRows;
     el.clearBtn.disabled = !canManageRows;
+  }
+  if (el.controlsBody) {
+    el.controlsBody.hidden = !canManageRows;
+  }
+  if (el.toggleControlsBtn) {
+    el.toggleControlsBtn.hidden = !canManageRows;
+    el.toggleControlsBtn.disabled = !canManageRows;
+  }
+  if (controlsSubtle) {
+    controlsSubtle.hidden = !canManageRows;
   }
 }
 

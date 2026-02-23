@@ -53,6 +53,8 @@ function renderRows() {
   const rowsHtml = visibleRows
     .map((row, index) => {
       const canDeleteRows = typeof hasAdminAccess === "function" ? hasAdminAccess() : true;
+      const updatedAtCompact = formatRowUpdatedAtCompact(row.updatedAt);
+      const updatedAtTitle = row.updatedAt ? `Последнее обновление: ${formatDateTime(row.updatedAt)}` : "";
       const data = row.data;
       const wbLink = `https://www.wildberries.ru/catalog/${row.nmId}/detail.aspx`;
       const status = buildStatus(row);
@@ -100,6 +102,15 @@ function renderRows() {
             </button>`
                 : ""
             }
+            <span class="actions-updated-at${updatedAtCompact ? "" : " actions-updated-at-empty"}"${
+              updatedAtTitle ? ` title="${escapeAttr(updatedAtTitle)}"` : ""
+            }>
+              ${
+                updatedAtCompact
+                  ? `<span class="actions-updated-date">${escapeHtml(updatedAtCompact.date)}</span><span class="actions-updated-time">${escapeHtml(updatedAtCompact.time)}</span>`
+                  : '<span class="actions-updated-date">--.--.--</span><span class="actions-updated-time">--:--</span>'
+              }
+            </span>
           </div>
         </td>
         <td>${startIndex + index + 1}</td>
@@ -152,6 +163,29 @@ function getCardCodeValue(data) {
     return "";
   }
   return value.replace(/\s+/g, "").slice(0, 36).toUpperCase();
+}
+
+function formatRowUpdatedAtCompact(valueRaw) {
+  if (!valueRaw) {
+    return null;
+  }
+
+  const date = new Date(valueRaw);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const pad = (value) => String(value).padStart(2, "0");
+  const day = pad(date.getDate());
+  const month = pad(date.getMonth() + 1);
+  const year = String(date.getFullYear()).slice(-2);
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+
+  return {
+    date: `${day}.${month}.${year}`,
+    time: `${hours}:${minutes}`,
+  };
 }
 
 function renderRowsPagination() {
