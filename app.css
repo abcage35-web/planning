@@ -2537,6 +2537,7 @@ tbody tr:hover {
 
 .actions-cell {
   min-width: 0;
+  position: relative;
 }
 
 .listing-col {
@@ -2863,15 +2864,20 @@ tbody tr:hover {
   flex-direction: column;
   gap: 5px;
   align-items: center;
+  min-height: 100%;
+  padding-bottom: 34px;
 }
 
 .actions-updated-at {
-  margin-top: 3px;
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
   display: grid;
   justify-items: center;
   gap: 1px;
   min-height: 22px;
-  width: 100%;
+  width: calc(100% - 8px);
   color: #496170;
   font: 600 8px/1 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
 }
