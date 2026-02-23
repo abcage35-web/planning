@@ -1127,6 +1127,10 @@ async function fetchCardPayload(nmIdRaw, options = {}) {
   const part = Math.floor(nmId / 1000);
 
   const shouldLoadMarket = mode !== "content-only";
+  const marketSnapshotPromise = shouldLoadMarket
+    ? fetchCardMarketSnapshot(nmId, { requestSignal })
+    : Promise.resolve(createEmptyMarketSnapshot());
+
   const loadByHost = async (hostSuffix) => {
     const base = `https://basket-${hostSuffix}.wbbasket.ru/vol${vol}/part${part}/${nmId}`;
     const cardPromise = fetchJson(
@@ -1134,11 +1138,8 @@ async function fetchCardPayload(nmIdRaw, options = {}) {
       { signal: requestSignal },
       { attempts: 2, timeoutMs: FAST_CARD_FETCH_TIMEOUT_MS },
     );
-    const marketPromise = shouldLoadMarket
-      ? fetchCardMarketSnapshot(nmId, { basketBase: base, requestSignal })
-      : Promise.resolve(createEmptyMarketSnapshot());
 
-    const [card, marketSnapshot] = await Promise.all([cardPromise, marketPromise]);
+    const [card, marketSnapshot] = await Promise.all([cardPromise, marketSnapshotPromise]);
     if (requestSignal && requestSignal.aborted) {
       throw new Error("Обновление остановлено пользователем");
     }
@@ -1530,10 +1531,8 @@ async function resolveBasketHost({ nmId, vol, part, forceProbe = false, requestS
   const cached = state.basketByVol[volKey];
 
   if (cached && !forceProbe) {
-    const alive = await checkHost(cached, nmId, vol, part, requestSignal, { fast: true });
-    if (alive) {
-      return cached;
-    }
+    // Оптимистично используем кэш; если хост устарел, будет повтор с forceProbe после ошибки card.json.
+    return cached;
   }
 
   const probeEnd = forceProbe ? Math.max(BASKET_END, 120) : BASKET_END;
