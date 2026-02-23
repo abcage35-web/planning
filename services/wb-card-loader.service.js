@@ -689,52 +689,83 @@ function applyMarketStabilityGuard(payload, previousData, row) {
     return;
   }
   if (!trustedStockSource) {
-    const previousStockValue = Number.isFinite(previous.stockValue)
-      ? Math.max(0, Math.round(previous.stockValue))
-      : Number.isFinite(row?.stockValue)
-        ? Math.max(0, Math.round(row.stockValue))
-        : null;
-    const previousInStock =
-      typeof previous.inStock === "boolean" ? previous.inStock : typeof row?.inStock === "boolean" ? row.inStock : null;
+    const previousStockSource = String(previous.stockSource || row?.stockSource || "").trim();
+    const previousStockTrusted = isTrustedMarketSource(previousStockSource);
 
-    if (Number.isFinite(previousStockValue)) {
-      payload.stockValue = previousStockValue;
-      payload.inStock = previousStockValue > 0;
-    } else if (typeof previousInStock === "boolean") {
+    if (!previousStockTrusted) {
       payload.stockValue = null;
-      payload.inStock = previousInStock;
-    }
+      payload.inStock = null;
+      payload.stockSource = "";
+    } else {
+      const previousStockValue = Number.isFinite(previous.stockValue)
+        ? Math.max(0, Math.round(previous.stockValue))
+        : Number.isFinite(row?.stockValue)
+          ? Math.max(0, Math.round(row.stockValue))
+          : null;
+      const previousInStock =
+        typeof previous.inStock === "boolean"
+          ? previous.inStock
+          : typeof row?.inStock === "boolean"
+            ? row.inStock
+            : null;
 
-    payload.stockSource = String(previous.stockSource || row?.stockSource || payload.stockSource || "");
+      if (Number.isFinite(previousStockValue)) {
+        payload.stockValue = previousStockValue;
+        payload.inStock = previousStockValue > 0;
+      } else if (typeof previousInStock === "boolean") {
+        payload.stockValue = null;
+        payload.inStock = previousInStock;
+      }
+
+      payload.stockSource = String(previous.stockSource || row?.stockSource || payload.stockSource || "");
+    }
   }
 
   if (!trustedPriceSource) {
-    const previousCurrentPrice = Number.isFinite(previous.currentPrice)
-      ? Math.max(0, Math.round(previous.currentPrice))
-      : Number.isFinite(row?.currentPrice)
-        ? Math.max(0, Math.round(row.currentPrice))
-        : null;
-    const previousBasePrice = Number.isFinite(previous.basePrice)
-      ? Math.max(0, Math.round(previous.basePrice))
-      : Number.isFinite(row?.basePrice)
-        ? Math.max(0, Math.round(row.basePrice))
-        : null;
+    const previousPriceSource = String(previous.priceSource || row?.priceSource || "").trim();
+    const previousPriceTrusted = isTrustedMarketSource(previousPriceSource);
 
-    if (Number.isFinite(previousCurrentPrice)) {
-      payload.currentPrice = previousCurrentPrice;
-    }
-    if (Number.isFinite(previousBasePrice)) {
-      payload.basePrice = previousBasePrice;
-    }
+    if (!previousPriceTrusted) {
+      payload.currentPrice = null;
+      payload.basePrice = null;
+      payload.priceSource = "";
+    } else {
+      const previousCurrentPrice = Number.isFinite(previous.currentPrice)
+        ? Math.max(0, Math.round(previous.currentPrice))
+        : Number.isFinite(row?.currentPrice)
+          ? Math.max(0, Math.round(row.currentPrice))
+          : null;
+      const previousBasePrice = Number.isFinite(previous.basePrice)
+        ? Math.max(0, Math.round(previous.basePrice))
+        : Number.isFinite(row?.basePrice)
+          ? Math.max(0, Math.round(row.basePrice))
+          : null;
 
-    payload.priceSource = String(previous.priceSource || row?.priceSource || payload.priceSource || "");
+      if (Number.isFinite(previousCurrentPrice)) {
+        payload.currentPrice = previousCurrentPrice;
+      }
+      if (Number.isFinite(previousBasePrice)) {
+        payload.basePrice = previousBasePrice;
+      }
+
+      payload.priceSource = String(previous.priceSource || row?.priceSource || payload.priceSource || "");
+    }
   }
 
-  if (!Number.isFinite(payload.rating) && Number.isFinite(previous.rating)) {
+  const previousStockSource = String(previous.stockSource || row?.stockSource || "").trim();
+  const previousPriceSource = String(previous.priceSource || row?.priceSource || "").trim();
+  const previousHadTrustedMarketSource =
+    isTrustedMarketSource(previousStockSource) || isTrustedMarketSource(previousPriceSource);
+
+  if (!Number.isFinite(payload.rating) && Number.isFinite(previous.rating) && previousHadTrustedMarketSource) {
     payload.rating = Math.round(Number(previous.rating) * 10) / 10;
   }
 
-  if (!Number.isFinite(payload.reviewCount) && Number.isFinite(previous.reviewCount)) {
+  if (
+    !Number.isFinite(payload.reviewCount) &&
+    Number.isFinite(previous.reviewCount) &&
+    previousHadTrustedMarketSource
+  ) {
     payload.reviewCount = Math.max(0, Math.round(previous.reviewCount));
   }
 }
