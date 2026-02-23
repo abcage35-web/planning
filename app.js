@@ -155,6 +155,20 @@ const ICON_LIBRARY = {
   chartLine: {
     paths: ["M3 3v18h18", "m7 14 4-4 3 3 4-6"],
   },
+  eye: {
+    paths: [
+      "M2.05 12a10.95 10.95 0 0 1 19.9 0 10.95 10.95 0 0 1-19.9 0",
+      "M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0",
+    ],
+  },
+  eyeOff: {
+    paths: [
+      "M4.5 4.5 19.5 19.5",
+      "M9.9 5.2A10.7 10.7 0 0 1 21.95 12a10.95 10.95 0 0 1-3.02 3.96",
+      "M14.1 18.8A10.7 10.7 0 0 1 2.05 12a10.95 10.95 0 0 1 3.02-3.96",
+      "M10.6 10.6a2 2 0 0 0 2.8 2.8",
+    ],
+  },
   logOut: {
     paths: ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "m16 17 5-5-5-5", "M21 12H9"],
   },
@@ -258,6 +272,7 @@ const el = {
   authForm: document.getElementById("authForm"),
   authLoginInput: document.getElementById("authLoginInput"),
   authPasswordInput: document.getElementById("authPasswordInput"),
+  authPasswordToggleBtn: document.getElementById("authPasswordToggleBtn"),
   authStatus: document.getElementById("authStatus"),
   authRoleBadge: document.getElementById("authRoleBadge"),
   authUserLabel: document.getElementById("authUserLabel"),
@@ -394,6 +409,7 @@ function hydrateStaticIcons() {
   setStaticButtonIcon(el.previewPrevBtn, "chevronLeft");
   setStaticButtonIcon(el.previewNextBtn, "chevronRight");
   setStaticButtonIcon(el.logoutBtn, "logOut");
+  syncAuthPasswordToggleIcon();
 }
 
 function createGuestAuthState() {
@@ -653,10 +669,32 @@ function applyAuthState(options = {}) {
   }
 
   applyRoleAccessState();
+  syncAuthPasswordToggleIcon();
 
   if (!loggedIn && focusLogin && el.authLoginInput) {
     el.authLoginInput.focus();
   }
+}
+
+function syncAuthPasswordToggleIcon() {
+  if (!el.authPasswordToggleBtn || !el.authPasswordInput) {
+    return;
+  }
+  const isVisible = el.authPasswordInput.type === "text";
+  setStaticButtonIcon(el.authPasswordToggleBtn, isVisible ? "eyeOff" : "eye");
+  el.authPasswordToggleBtn.setAttribute("aria-pressed", String(isVisible));
+  el.authPasswordToggleBtn.setAttribute("aria-label", isVisible ? "Скрыть пароль" : "Показать пароль");
+  el.authPasswordToggleBtn.setAttribute("title", isVisible ? "Скрыть пароль" : "Показать пароль");
+}
+
+function handleToggleAuthPasswordVisibility() {
+  if (!el.authPasswordInput) {
+    return;
+  }
+  const nextType = el.authPasswordInput.type === "text" ? "password" : "text";
+  el.authPasswordInput.type = nextType;
+  syncAuthPasswordToggleIcon();
+  el.authPasswordInput.focus();
 }
 
 async function handleLogout() {
@@ -679,6 +717,9 @@ function handleAuthRequired() {
 function bindEvents() {
   if (el.authForm) {
     el.authForm.addEventListener("submit", handleAuthSubmit);
+  }
+  if (el.authPasswordToggleBtn) {
+    el.authPasswordToggleBtn.addEventListener("click", handleToggleAuthPasswordVisibility);
   }
   if (el.logoutBtn) {
     el.logoutBtn.addEventListener("click", handleLogout);
