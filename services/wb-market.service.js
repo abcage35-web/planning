@@ -418,6 +418,7 @@
 
     const nmId = Number(nmIdRaw);
     const basketBase = typeof options?.basketBase === "string" ? options.basketBase.trim() : "";
+    const strictPrimary = options?.strictPrimary === true;
     if (!Number.isInteger(nmId) || nmId <= 0) {
       return createEmptyMarketSnapshot();
     }
@@ -440,6 +441,10 @@
         snapshot,
         extractMarketSnapshotFromCardV4(response.data, nmId, "card-v4"),
       );
+    }
+
+    if (strictPrimary) {
+      return snapshot;
     }
 
     if (snapshot.currentPrice === null || snapshot.stockValue === null) {

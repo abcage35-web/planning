@@ -1194,7 +1194,7 @@ async function fetchCardPayload(nmIdRaw, options = {}) {
       { attempts: 2, timeoutMs: FAST_CARD_FETCH_TIMEOUT_MS },
     );
     const marketPromise = shouldLoadMarket
-      ? fetchCardMarketSnapshot(nmId, { basketBase: base, requestSignal })
+      ? fetchCardMarketSnapshot(nmId, { basketBase: base, requestSignal, strictPrimary: true })
       : Promise.resolve(createEmptyMarketSnapshot());
 
     const [card, marketSnapshot] = await Promise.all([cardPromise, marketPromise]);
