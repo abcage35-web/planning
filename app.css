@@ -19,7 +19,7 @@
   --scrollbar-thumb-hover: rgba(26, 41, 50, 0.34);
   --overlay-note-gap: 12px;
   --overlay-note-font-size: 12px;
-  --global-head-control-height: 40px;
+  --global-head-control-height: 36px;
 }
 
 * {
@@ -71,7 +71,7 @@ body {
     radial-gradient(circle at 80% 20%, #d7f0ef 0%, transparent 38%),
     linear-gradient(160deg, #f8f5ef, #ecebe2 58%, #e5ebea);
   line-height: 1.35;
-  padding: 18px;
+  padding: 12px;
   position: relative;
 }
 
@@ -100,7 +100,7 @@ body {
 }
 
 .app-shell {
-  width: min(98vw, 1950px);
+  width: min(100%, 1950px);
   margin: 0 auto;
   position: relative;
   z-index: 1;
@@ -134,7 +134,7 @@ body {
 
 .global-filters-frame {
   margin-top: 6px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   position: sticky;
   top: 8px;
   z-index: 45;
@@ -164,8 +164,8 @@ body {
   margin-top: 0;
   min-height: var(--global-head-control-height);
   height: var(--global-head-control-height);
-  padding: 0 14px;
-  border-radius: 12px;
+  padding: 0 12px;
+  border-radius: 11px;
   display: inline-flex;
   align-items: center;
 }
@@ -175,8 +175,8 @@ body {
   align-items: center;
   gap: 6px;
   min-height: var(--global-head-control-height);
-  padding: 4px 7px 4px 10px;
-  border-radius: 999px;
+  padding: 3px 6px 3px 9px;
+  border-radius: 16px;
   border: 1px solid rgba(22, 58, 73, 0.2);
   background: rgba(237, 245, 248, 0.88);
 }
@@ -209,20 +209,21 @@ body {
 }
 
 .auth-logout-btn {
-  min-width: 34px;
-  width: 34px;
-  height: 32px;
-  min-height: 32px;
+  min-width: 32px;
+  width: 32px;
+  height: 30px;
+  min-height: 30px;
   padding: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   color: #32505f;
   border-color: rgba(40, 67, 81, 0.26);
   background: rgba(255, 255, 255, 0.94);
 }
 
 .auth-logout-btn .ui-icon {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.2;
 }
 
 .auth-logout-btn .btn-label {
@@ -384,7 +385,7 @@ body {
   gap: 6px;
   min-height: var(--global-head-control-height);
   height: var(--global-head-control-height);
-  padding: 0 14px;
+  padding: 0 12px;
   border-radius: 999px;
   border: 1px solid rgba(24, 57, 72, 0.14);
   background: rgba(236, 244, 247, 0.9);
