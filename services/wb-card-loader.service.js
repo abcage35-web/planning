@@ -207,6 +207,9 @@ function getActionLabel(actionKeyRaw) {
   if (actionKey === "all") {
     return "Карточка";
   }
+  if (actionKey === "scheduled" || actionKey === "scheduled-retry") {
+    return "Плановое";
+  }
   if (actionKey === "row-refresh") {
     return "Строка";
   }

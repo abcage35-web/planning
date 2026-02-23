@@ -3,6 +3,493 @@
  * фильтры, лимиты, кабинеты и bulk-обработчики.
  */
 
+const SHADOW_UPDATE_MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
+const SHADOW_UPDATE_SLOTS_MSK = [0, 12];
+const SHADOW_UPDATE_LOCK_TTL_MS = 45 * 60 * 1000;
+const SHADOW_UPDATE_RECHECK_DELAY_MS = 90 * 1000;
+const SHADOW_UPDATE_INIT_DELAY_MS = 1800;
+const SHADOW_UPDATE_LOCK_KEY_SUFFIX = "shadow-update-lock-v1";
+const SHADOW_UPDATE_LAST_SLOT_KEY_SUFFIX = "shadow-update-last-slot-msk-v1";
+
+const shadowUpdateScheduler = {
+  started: false,
+  inFlight: false,
+  timer: 0,
+  runningSlotKey: "",
+  lockToken: "",
+  tabId: `tab-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+};
+
+function pad2(value) {
+  return String(Math.max(0, Number(value) || 0)).padStart(2, "0");
+}
+
+function getShadowUpdateStoragePrefix() {
+  const key = typeof STORAGE_KEY === "string" ? STORAGE_KEY.trim() : "";
+  return key || "wb-dashboard-v2";
+}
+
+function getShadowUpdateLockKey() {
+  return `${getShadowUpdateStoragePrefix()}:${SHADOW_UPDATE_LOCK_KEY_SUFFIX}`;
+}
+
+function getShadowUpdateLastSlotKey() {
+  return `${getShadowUpdateStoragePrefix()}:${SHADOW_UPDATE_LAST_SLOT_KEY_SUFFIX}`;
+}
+
+function isValidShadowSlotKey(valueRaw) {
+  return /^\d{4}-\d{2}-\d{2}T(?:00|12):00\+03$/.test(String(valueRaw || "").trim());
+}
+
+function getMskDateParts(nowMs = Date.now()) {
+  const mskDate = new Date(Number(nowMs) + SHADOW_UPDATE_MSK_OFFSET_MS);
+  return {
+    year: mskDate.getUTCFullYear(),
+    monthIndex: mskDate.getUTCMonth(),
+    month: mskDate.getUTCMonth() + 1,
+    day: mskDate.getUTCDate(),
+    hour: mskDate.getUTCHours(),
+  };
+}
+
+function buildMskSlotKey(year, month, day, hour) {
+  return `${year}-${pad2(month)}-${pad2(day)}T${pad2(hour)}:00+03`;
+}
+
+function toUtcMsFromMsk(year, monthIndex, day, hour) {
+  return Date.UTC(year, monthIndex, day, hour, 0, 0, 0) - SHADOW_UPDATE_MSK_OFFSET_MS;
+}
+
+function getCurrentMskSlotInfo(nowMs = Date.now()) {
+  const parts = getMskDateParts(nowMs);
+  const slotHour = parts.hour >= 12 ? 12 : 0;
+  return {
+    slotKey: buildMskSlotKey(parts.year, parts.month, parts.day, slotHour),
+    slotHour,
+    slotStartMs: toUtcMsFromMsk(parts.year, parts.monthIndex, parts.day, slotHour),
+  };
+}
+
+function getNextMskSlotStartMs(nowMs = Date.now()) {
+  const parts = getMskDateParts(nowMs);
+  const candidates = [
+    ...SHADOW_UPDATE_SLOTS_MSK.map((hour) => toUtcMsFromMsk(parts.year, parts.monthIndex, parts.day, hour)),
+    ...SHADOW_UPDATE_SLOTS_MSK.map((hour) => toUtcMsFromMsk(parts.year, parts.monthIndex, parts.day + 1, hour)),
+  ];
+  const minFutureMs = Number(nowMs) + 1000;
+  for (const candidate of candidates) {
+    if (candidate > minFutureMs) {
+      return candidate;
+    }
+  }
+  return Number(nowMs) + 6 * 60 * 60 * 1000;
+}
+
+function readShadowLastSlotKey() {
+  try {
+    const raw = String(localStorage.getItem(getShadowUpdateLastSlotKey()) || "").trim();
+    return isValidShadowSlotKey(raw) ? raw : "";
+  } catch {
+    return "";
+  }
+}
+
+function writeShadowLastSlotKey(slotKeyRaw) {
+  const slotKey = String(slotKeyRaw || "").trim();
+  if (!isValidShadowSlotKey(slotKey)) {
+    return;
+  }
+  try {
+    localStorage.setItem(getShadowUpdateLastSlotKey(), slotKey);
+  } catch {
+    // noop
+  }
+}
+
+function readShadowLockState() {
+  try {
+    const raw = localStorage.getItem(getShadowUpdateLockKey());
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+    const slotKey = String(parsed.slotKey || "").trim();
+    const tabId = String(parsed.tabId || "").trim();
+    const token = String(parsed.token || "").trim();
+    const expiresAt = Number(parsed.expiresAt);
+    if (!slotKey || !token || !tabId || !Number.isFinite(expiresAt)) {
+      return null;
+    }
+    return { slotKey, tabId, token, expiresAt };
+  } catch {
+    return null;
+  }
+}
+
+function acquireShadowUpdateLock(slotKeyRaw) {
+  const slotKey = String(slotKeyRaw || "").trim();
+  if (!isValidShadowSlotKey(slotKey)) {
+    return "";
+  }
+
+  const now = Date.now();
+  const current = readShadowLockState();
+  if (
+    current &&
+    current.slotKey === slotKey &&
+    current.expiresAt > now &&
+    current.tabId &&
+    current.tabId !== shadowUpdateScheduler.tabId
+  ) {
+    return "";
+  }
+
+  const token = `${shadowUpdateScheduler.tabId}-${now}-${Math.random().toString(16).slice(2, 8)}`;
+  const lockPayload = {
+    slotKey,
+    tabId: shadowUpdateScheduler.tabId,
+    token,
+    expiresAt: now + SHADOW_UPDATE_LOCK_TTL_MS,
+  };
+
+  try {
+    localStorage.setItem(getShadowUpdateLockKey(), JSON.stringify(lockPayload));
+    const check = readShadowLockState();
+    if (check && check.token === token && check.tabId === shadowUpdateScheduler.tabId) {
+      return token;
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function releaseShadowUpdateLock(tokenRaw) {
+  const token = String(tokenRaw || "").trim();
+  if (!token) {
+    return;
+  }
+
+  try {
+    const current = readShadowLockState();
+    if (current && current.token === token) {
+      localStorage.removeItem(getShadowUpdateLockKey());
+    }
+  } catch {
+    // noop
+  }
+}
+
+function clearShadowUpdateTimer() {
+  if (!shadowUpdateScheduler.timer) {
+    return;
+  }
+  clearTimeout(shadowUpdateScheduler.timer);
+  shadowUpdateScheduler.timer = 0;
+}
+
+function scheduleShadowUpdateCheck(options = {}) {
+  if (!shadowUpdateScheduler.started) {
+    return;
+  }
+  clearShadowUpdateTimer();
+
+  const customDelayMs = Number(options.delayMs);
+  const delayMs = Number.isFinite(customDelayMs)
+    ? Math.max(1000, Math.round(customDelayMs))
+    : Math.max(1000, getNextMskSlotStartMs(Date.now()) - Date.now() + 1500);
+
+  shadowUpdateScheduler.timer = setTimeout(() => {
+    shadowUpdateScheduler.timer = 0;
+    maybeRunShadowScheduledUpdate("timer").catch(() => {
+      scheduleShadowUpdateCheck({ delayMs: SHADOW_UPDATE_RECHECK_DELAY_MS });
+    });
+  }, delayMs);
+}
+
+function getShadowRowIds() {
+  return Array.isArray(state.rows) ? state.rows.map((row) => row?.id).filter(Boolean) : [];
+}
+
+function deepCloneJson(value) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return null;
+  }
+}
+
+function cloneRowsForShadowUpdate(rowsRaw) {
+  const rows = Array.isArray(rowsRaw) ? rowsRaw : [];
+  return rows.map((row) => ({
+    id: String(row?.id || ""),
+    nmId: String(row?.nmId || "").trim(),
+    cabinet: String(row?.cabinet || "").trim(),
+    supplierId: normalizeSupplierId(row?.supplierId),
+    stockValue: Number.isFinite(row?.stockValue) ? Math.max(0, Math.round(row.stockValue)) : null,
+    inStock: typeof row?.inStock === "boolean" ? row.inStock : null,
+    stockSource: String(row?.stockSource || ""),
+    currentPrice: Number.isFinite(row?.currentPrice) ? Math.max(0, Math.round(row.currentPrice)) : null,
+    basePrice: Number.isFinite(row?.basePrice) ? Math.max(0, Math.round(row.basePrice)) : null,
+    priceSource: String(row?.priceSource || ""),
+    loading: false,
+    queuedForRefresh: false,
+    error: String(row?.error || ""),
+    data: row?.data && typeof row.data === "object" ? deepCloneJson(row.data) : null,
+    updatedAt: row?.updatedAt || null,
+    updateLogs: normalizeRowUpdateLogs(row?.updateLogs),
+  }));
+}
+
+function findShadowRowById(shadowRows, rowIdRaw) {
+  const rowId = String(rowIdRaw || "").trim();
+  if (!rowId) {
+    return null;
+  }
+  return shadowRows.find((row) => String(row?.id || "") === rowId) || null;
+}
+
+async function updateShadowRow(shadowRow, options = {}) {
+  if (!shadowRow || typeof shadowRow !== "object" || !shadowRow.nmId) {
+    return;
+  }
+
+  const actionKey = String(options.actionKey || "scheduled").trim() || "scheduled";
+  const beforeSnapshot = captureRowUpdateSnapshot(shadowRow);
+  const previousData = shadowRow.data && typeof shadowRow.data === "object" ? shadowRow.data : null;
+
+  try {
+    const payload = await fetchCardPayload(shadowRow.nmId, {
+      mode: "full",
+      previousCoverDuplicate:
+        previousData && typeof previousData.coverSlideDuplicate === "boolean"
+          ? previousData.coverSlideDuplicate
+          : null,
+      previousPhotoCount:
+        previousData && Number.isFinite(previousData.photoCount)
+          ? Math.max(0, Math.round(previousData.photoCount))
+          : null,
+    });
+
+    applyMarketStabilityGuard(payload, previousData, shadowRow);
+    shadowRow.updatedAt = new Date().toISOString();
+    shadowRow.error = "";
+    shadowRow.data = payload;
+
+    if (payload.supplierId) {
+      shadowRow.supplierId = String(payload.supplierId);
+    }
+
+    const cabinetFromMap = getCabinetBySupplierId(shadowRow.supplierId);
+    if (cabinetFromMap) {
+      shadowRow.cabinet = cabinetFromMap;
+    }
+
+    mergeStockIntoRow(shadowRow, {
+      stockValue: payload.stockValue,
+      inStock: payload.inStock,
+      source: payload.stockSource || "card-v4",
+    });
+    mergePriceIntoRow(shadowRow, {
+      currentPrice: payload.currentPrice,
+      basePrice: payload.basePrice,
+      source: payload.priceSource || "card-v4",
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    shadowRow.error = errorMessage;
+  } finally {
+    const afterSnapshot = captureRowUpdateSnapshot(shadowRow);
+    const changes = getRowUpdateChanges(beforeSnapshot, afterSnapshot);
+    if (changes.length === 0 && afterSnapshot.marketError) {
+      changes.push({
+        field: "marketError",
+        label: "Рынок: ошибка источника",
+        beforeText: "повтор",
+        afterText: afterSnapshot.marketError,
+      });
+    }
+    appendRowUpdateLog(shadowRow, {
+      at: new Date().toISOString(),
+      source: "system",
+      mode: "full",
+      actionKey,
+      status: shadowRow.error ? "error" : "success",
+      error: shadowRow.error || "",
+      changes,
+    });
+  }
+}
+
+async function runShadowRowsUpdate(shadowRows) {
+  const rowIds = shadowRows.map((row) => row.id).filter(Boolean);
+  if (rowIds.length === 0) {
+    return;
+  }
+
+  await runWithConcurrency(
+    rowIds,
+    BULK_CONCURRENCY,
+    async (rowId) => {
+      const row = findShadowRowById(shadowRows, rowId);
+      if (!row) {
+        return;
+      }
+      await updateShadowRow(row, { actionKey: "scheduled" });
+    },
+  );
+
+  const retryIds = rowIds.filter((rowId) => {
+    const row = findShadowRowById(shadowRows, rowId);
+    return Boolean(row?.error && isRetriableRowError(row.error));
+  });
+
+  if (retryIds.length <= 0) {
+    return;
+  }
+
+  await sleep(900);
+  await runWithConcurrency(
+    retryIds,
+    BULK_CONCURRENCY,
+    async (rowId) => {
+      const row = findShadowRowById(shadowRows, rowId);
+      if (!row) {
+        return;
+      }
+      await updateShadowRow(row, { actionKey: "scheduled-retry" });
+    },
+  );
+}
+
+function saveShadowPendingPayload(shadowRows) {
+  if (!Array.isArray(shadowRows)) {
+    return false;
+  }
+
+  const shadowLastSyncAt = new Date().toISOString();
+  const nextSnapshots = normalizeProblemSnapshots([
+    ...(Array.isArray(state.updateSnapshots) ? state.updateSnapshots : []),
+    buildProblemSnapshot(shadowRows, {
+      source: "system",
+      actionKey: "scheduled",
+      mode: "full",
+      at: shadowLastSyncAt,
+    }),
+  ]);
+
+  const payload =
+    typeof buildStatePayload === "function"
+      ? buildStatePayload(shadowLastSyncAt, {
+          rows: shadowRows,
+          lastSyncAt: shadowLastSyncAt,
+          updateSnapshots: nextSnapshots,
+        })
+      : null;
+
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+
+  if (typeof persistShadowPendingPayload === "function") {
+    persistShadowPendingPayload(payload);
+    return true;
+  }
+
+  return false;
+}
+
+async function maybeRunShadowScheduledUpdate(trigger = "timer") {
+  if (!shadowUpdateScheduler.started || shadowUpdateScheduler.inFlight) {
+    return;
+  }
+
+  const slot = getCurrentMskSlotInfo(Date.now());
+  if (!slot || !isValidShadowSlotKey(slot.slotKey)) {
+    scheduleShadowUpdateCheck({ delayMs: SHADOW_UPDATE_RECHECK_DELAY_MS });
+    return;
+  }
+
+  const lastSlotKey = readShadowLastSlotKey();
+  if (lastSlotKey === slot.slotKey) {
+    scheduleShadowUpdateCheck();
+    return;
+  }
+
+  if (state.isBulkLoading) {
+    scheduleShadowUpdateCheck({ delayMs: SHADOW_UPDATE_RECHECK_DELAY_MS });
+    return;
+  }
+
+  const rowIds = getShadowRowIds();
+  if (rowIds.length === 0) {
+    writeShadowLastSlotKey(slot.slotKey);
+    scheduleShadowUpdateCheck();
+    return;
+  }
+
+  const lockToken = acquireShadowUpdateLock(slot.slotKey);
+  if (!lockToken) {
+    scheduleShadowUpdateCheck({ delayMs: SHADOW_UPDATE_RECHECK_DELAY_MS });
+    return;
+  }
+
+  shadowUpdateScheduler.inFlight = true;
+  shadowUpdateScheduler.runningSlotKey = slot.slotKey;
+  shadowUpdateScheduler.lockToken = lockToken;
+  let canceled = false;
+  let success = false;
+
+  try {
+    const shadowRows = cloneRowsForShadowUpdate(state.rows);
+    await runShadowRowsUpdate(shadowRows);
+    success = saveShadowPendingPayload(shadowRows);
+    if (success) {
+      writeShadowLastSlotKey(slot.slotKey);
+    }
+  } catch {
+    canceled = true;
+    scheduleShadowUpdateCheck({ delayMs: SHADOW_UPDATE_RECHECK_DELAY_MS });
+  } finally {
+    shadowUpdateScheduler.inFlight = false;
+    shadowUpdateScheduler.runningSlotKey = "";
+    releaseShadowUpdateLock(lockToken);
+    shadowUpdateScheduler.lockToken = "";
+    if (canceled || !success) {
+      scheduleShadowUpdateCheck({ delayMs: SHADOW_UPDATE_RECHECK_DELAY_MS });
+    } else {
+      scheduleShadowUpdateCheck();
+    }
+  }
+}
+
+function handleShadowSchedulerVisibilityChange() {
+  if (document.visibilityState !== "visible") {
+    return;
+  }
+  maybeRunShadowScheduledUpdate("visibility").catch(() => {});
+}
+
+function handleShadowSchedulerFocus() {
+  maybeRunShadowScheduledUpdate("focus").catch(() => {});
+}
+
+function initShadowUpdateScheduler() {
+  if (shadowUpdateScheduler.started) {
+    return;
+  }
+
+  shadowUpdateScheduler.started = true;
+  document.addEventListener("visibilitychange", handleShadowSchedulerVisibilityChange);
+  window.addEventListener("focus", handleShadowSchedulerFocus);
+
+  scheduleShadowUpdateCheck({ delayMs: SHADOW_UPDATE_INIT_DELAY_MS });
+}
+
 function normalizeRowsLimit(value) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed)) {

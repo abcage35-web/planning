@@ -39,6 +39,7 @@ const BULK_TOAST_HIDE_DELAY_MS = 1400;
 const BULK_ACTION_LABELS = {
   all: "Обновить карточки",
   problem: "Обновить проблемные",
+  scheduled: "Фоновое обновление",
 };
 
 const DEFAULT_SELLER_SETTINGS = [
@@ -339,6 +340,9 @@ async function init() {
   render();
   if (typeof ensureProblemSnapshotsInitialized === "function") {
     ensureProblemSnapshotsInitialized();
+  }
+  if (typeof initShadowUpdateScheduler === "function") {
+    initShadowUpdateScheduler();
   }
   registerServiceWorker();
 }

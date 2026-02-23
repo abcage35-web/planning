@@ -630,12 +630,26 @@ function formatDateTime(value) {
   }).format(date);
 }
 
-function buildStatePayload(savedAtRaw = null) {
+function buildStatePayload(savedAtRaw = null, overrides = {}) {
+  const overridesObject = overrides && typeof overrides === "object" ? overrides : {};
+  const sourceRows = Array.isArray(overridesObject.rows) ? overridesObject.rows : state.rows;
+  const sourceUpdateSnapshots = Array.isArray(overridesObject.updateSnapshots)
+    ? overridesObject.updateSnapshots
+    : state.updateSnapshots;
+  const sourceBasketByVol =
+    overridesObject.basketByVol && typeof overridesObject.basketByVol === "object"
+      ? overridesObject.basketByVol
+      : state.basketByVol;
+  const sourceLastSyncAt =
+    overridesObject.lastSyncAt === null || overridesObject.lastSyncAt === undefined
+      ? state.lastSyncAt
+      : overridesObject.lastSyncAt;
+
   const savedAtDate = savedAtRaw ? new Date(savedAtRaw) : new Date();
   const savedAt = Number.isNaN(savedAtDate.getTime()) ? new Date().toISOString() : savedAtDate.toISOString();
   return {
     savedAt,
-    rows: state.rows.map((row) => ({
+    rows: sourceRows.map((row) => ({
       id: row.id,
       nmId: row.nmId,
       cabinet: row.cabinet,
@@ -651,8 +665,8 @@ function buildStatePayload(savedAtRaw = null) {
       updatedAt: row.updatedAt,
       updateLogs: normalizeRowUpdateLogs(row.updateLogs),
     })),
-    basketByVol: state.basketByVol,
-    lastSyncAt: state.lastSyncAt,
+    basketByVol: sourceBasketByVol,
+    lastSyncAt: sourceLastSyncAt,
     filters: state.filters,
     controlsCollapsed: state.controlsCollapsed,
     rowsLimit: state.rowsLimit,
@@ -673,7 +687,7 @@ function buildStatePayload(savedAtRaw = null) {
     tagsProblemOnly: state.tagsProblemOnly,
     sellerSettings: state.sellerSettings,
     colorVariantsCache: state.colorVariantsCache,
-    updateSnapshots: normalizeProblemSnapshots(state.updateSnapshots),
+    updateSnapshots: normalizeProblemSnapshots(sourceUpdateSnapshots),
     chartCabinetFilter: state.chartCabinetFilter,
   };
 }
@@ -698,6 +712,47 @@ function readLocalStatePayload() {
   }
 }
 
+function getShadowPendingStorageKey() {
+  return `${STORAGE_KEY}:shadow-pending-v1`;
+}
+
+function persistShadowPendingPayload(payload) {
+  if (!payload || typeof payload !== "object") {
+    return;
+  }
+  try {
+    localStorage.setItem(getShadowPendingStorageKey(), JSON.stringify(payload));
+  } catch {
+    // noop
+  }
+}
+
+function readShadowPendingPayload() {
+  let raw = "";
+  try {
+    raw = String(localStorage.getItem(getShadowPendingStorageKey()) || "");
+  } catch {
+    return null;
+  }
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearShadowPendingPayload() {
+  try {
+    localStorage.removeItem(getShadowPendingStorageKey());
+  } catch {
+    // noop
+  }
+}
+
 function getStatePayloadSavedAtMs(payload) {
   if (!payload || typeof payload !== "object") {
     return 0;
@@ -710,20 +765,24 @@ function getStatePayloadSavedAtMs(payload) {
   return Number.isFinite(savedAtMs) ? savedAtMs : 0;
 }
 
-function pickStatePayload(localPayload, remotePayload) {
-  if (localPayload && !remotePayload) {
-    return localPayload;
-  }
-  if (!localPayload && remotePayload) {
-    return remotePayload;
-  }
-  if (!localPayload && !remotePayload) {
+function pickStatePayload(...payloadsRaw) {
+  const payloads = payloadsRaw.filter((payload) => payload && typeof payload === "object");
+  if (payloads.length <= 0) {
     return null;
   }
 
-  const localMs = getStatePayloadSavedAtMs(localPayload);
-  const remoteMs = getStatePayloadSavedAtMs(remotePayload);
-  return remoteMs > localMs ? remotePayload : localPayload;
+  let best = payloads[0];
+  let bestMs = getStatePayloadSavedAtMs(best);
+  for (let index = 1; index < payloads.length; index += 1) {
+    const candidate = payloads[index];
+    const candidateMs = getStatePayloadSavedAtMs(candidate);
+    if (candidateMs > bestMs) {
+      best = candidate;
+      bestMs = candidateMs;
+    }
+  }
+
+  return best;
 }
 
 function applyParsedState(parsed) {
@@ -849,6 +908,7 @@ function persistState() {
 async function restoreState() {
   const localPayload = readLocalStatePayload();
   let remotePayload = null;
+  const shadowPendingPayload = readShadowPendingPayload();
 
   if (typeof loadCloudStatePayload === "function") {
     try {
@@ -858,7 +918,7 @@ async function restoreState() {
     }
   }
 
-  const payload = pickStatePayload(localPayload, remotePayload);
+  const payload = pickStatePayload(localPayload, remotePayload, shadowPendingPayload);
   if (!payload) {
     return;
   }
@@ -870,7 +930,13 @@ async function restoreState() {
     return;
   }
 
-  if (payload === remotePayload) {
+  if (payload === shadowPendingPayload) {
+    clearShadowPendingPayload();
+    persistStateLocalPayload(payload);
+    if (typeof queueCloudStateSync === "function") {
+      queueCloudStateSync(payload);
+    }
+  } else if (payload === remotePayload) {
     persistStateLocalPayload(payload);
   } else if (payload === localPayload && typeof queueCloudStateSync === "function") {
     const localMs = getStatePayloadSavedAtMs(localPayload);
