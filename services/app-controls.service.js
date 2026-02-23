@@ -366,7 +366,7 @@ async function runShadowRowsUpdate(shadowRows) {
   );
 }
 
-function saveShadowPendingPayload(shadowRows) {
+async function saveShadowPendingPayload(shadowRows) {
   if (!Array.isArray(shadowRows)) {
     return false;
   }
@@ -393,6 +393,24 @@ function saveShadowPendingPayload(shadowRows) {
 
   if (!payload || typeof payload !== "object") {
     return false;
+  }
+
+  const canUseCloudSync = typeof isAuthenticated === "function" ? isAuthenticated() : true;
+  if (canUseCloudSync && typeof sendCloudStatePayload === "function") {
+    try {
+      const pushed = await sendCloudStatePayload(payload);
+      if (pushed) {
+        if (typeof persistStateLocalPayload === "function") {
+          persistStateLocalPayload(payload);
+        }
+        if (typeof clearShadowPendingPayload === "function") {
+          clearShadowPendingPayload();
+        }
+        return true;
+      }
+    } catch {
+      // fallback to local shadow payload
+    }
   }
 
   if (typeof persistShadowPendingPayload === "function") {
@@ -447,7 +465,7 @@ async function maybeRunShadowScheduledUpdate(trigger = "timer") {
   try {
     const shadowRows = cloneRowsForShadowUpdate(state.rows);
     await runShadowRowsUpdate(shadowRows);
-    success = saveShadowPendingPayload(shadowRows);
+    success = await saveShadowPendingPayload(shadowRows);
     if (success) {
       writeShadowLastSlotKey(slot.slotKey);
     }

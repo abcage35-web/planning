@@ -919,8 +919,10 @@ async function restoreState(options = {}) {
   let remotePayload = null;
   const shadowPendingPayload = readShadowPendingPayload();
   const canUseCloudSync = typeof isAuthenticated === "function" ? isAuthenticated() : true;
+  const cloudEnabled = typeof isCloudStateDisabled === "function" ? !isCloudStateDisabled() : true;
+  const cloudAuthoritative = canUseCloudSync && cloudEnabled && typeof loadCloudStatePayload === "function";
 
-  if (canUseCloudSync && typeof loadCloudStatePayload === "function") {
+  if (cloudAuthoritative) {
     try {
       remotePayload = await loadCloudStatePayload();
     } catch {
@@ -928,16 +930,43 @@ async function restoreState(options = {}) {
     }
   }
 
-  const localRowsCount = getPayloadRowsCount(localPayload);
-  const remoteRowsCount = getPayloadRowsCount(remotePayload);
-  const useLocalOverEmptyRemote =
-    preferRemote && canUseCloudSync && localPayload && localRowsCount > 0 && remotePayload && remoteRowsCount <= 0;
+  if (cloudAuthoritative) {
+    if (remotePayload && typeof remotePayload === "object") {
+      try {
+        applyParsedState(remotePayload);
+      } catch {
+        resetStateToDefaults();
+        return;
+      }
+      persistStateLocalPayload(remotePayload);
+      return;
+    }
 
-  const payload = useLocalOverEmptyRemote
-    ? localPayload
-    : preferRemote && canUseCloudSync && remotePayload
-      ? remotePayload
-      : pickStatePayload(localPayload, remotePayload, shadowPendingPayload);
+    const allowCloudBootstrap = options?.allowCloudBootstrap !== false;
+    if (allowCloudBootstrap) {
+      const nonEmptyShadowPayload = getPayloadRowsCount(shadowPendingPayload) > 0 ? shadowPendingPayload : null;
+      const nonEmptyLocalPayload = getPayloadRowsCount(localPayload) > 0 ? localPayload : null;
+      const bootstrapPayload = pickStatePayload(nonEmptyShadowPayload, nonEmptyLocalPayload);
+      if (bootstrapPayload) {
+        try {
+          applyParsedState(bootstrapPayload);
+        } catch {
+          resetStateToDefaults();
+          return;
+        }
+        persistStateLocalPayload(bootstrapPayload);
+        if (typeof queueCloudStateSync === "function") {
+          queueCloudStateSync(bootstrapPayload);
+        }
+        return;
+      }
+    }
+
+    resetStateToDefaults();
+    return;
+  }
+
+  const payload = preferRemote && remotePayload ? remotePayload : pickStatePayload(localPayload, remotePayload, shadowPendingPayload);
   if (!payload) {
     return;
   }
@@ -960,9 +989,7 @@ async function restoreState(options = {}) {
   } else if (payload === localPayload && canUseCloudSync && typeof queueCloudStateSync === "function") {
     const localMs = getStatePayloadSavedAtMs(localPayload);
     const remoteMs = getStatePayloadSavedAtMs(remotePayload);
-    const remoteRowsCount = getPayloadRowsCount(remotePayload);
-    const localRowsCount = getPayloadRowsCount(localPayload);
-    if (!remotePayload || localMs >= remoteMs || (localRowsCount > 0 && remoteRowsCount <= 0)) {
+    if (!remotePayload || localMs >= remoteMs) {
       queueCloudStateSync(localPayload);
     }
   }
