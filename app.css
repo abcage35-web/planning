@@ -2312,11 +2312,11 @@ table {
 }
 
 .col-product-info {
-  width: 11%;
+  width: 12%;
 }
 
 .col-checks {
-  width: 13%;
+  width: 12%;
 }
 
 .col-listing {
@@ -4443,7 +4443,10 @@ tbody tr:hover {
   }
 
   body {
-    padding: 10px;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-right: 8px;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+    padding-left: 8px;
   }
 
   .app-shell {
@@ -4464,7 +4467,7 @@ tbody tr:hover {
     top: auto;
     z-index: 2;
     margin-top: 0;
-    padding: 8px;
+    padding: 6px;
   }
 
   .global-filters-head {
@@ -4487,9 +4490,10 @@ tbody tr:hover {
   }
 
   .global-filters-body {
-    max-height: 58vh;
+    max-height: 52vh;
     overflow-y: auto;
     padding-right: 2px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .global-columns-filters {
@@ -4622,17 +4626,19 @@ tbody tr:hover {
   }
 
   .table-panel {
-    padding: 8px;
+    padding: 6px;
     overflow: hidden;
   }
 
   .table-tools {
-    justify-content: flex-start;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
   }
 
   .table-pagination {
     width: 100%;
-    justify-content: flex-start;
+    justify-content: space-between;
   }
 
   .bulk-progress-toast {
@@ -4657,12 +4663,18 @@ tbody tr:hover {
   }
 
   .col-actions {
-    width: 72px;
+    width: 64px;
   }
 
   .table-wrap > table {
-    min-width: 1460px;
-    width: 1460px;
+    min-width: 1220px;
+    width: 1220px;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   .actions-updated-at {
