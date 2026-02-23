@@ -40,6 +40,34 @@
     return Math.max(0, Math.round(value / 100));
   }
 
+  function toPositiveInteger(valueRaw) {
+    if (typeof valueRaw === "number" && Number.isInteger(valueRaw) && valueRaw > 0) {
+      return valueRaw;
+    }
+    if (typeof valueRaw === "string") {
+      const normalized = valueRaw.trim();
+      if (/^\d+$/.test(normalized)) {
+        const parsed = Number(normalized);
+        if (Number.isInteger(parsed) && parsed > 0) {
+          return parsed;
+        }
+      }
+    }
+    return null;
+  }
+
+  function extractNmIdFromEntry(entry) {
+    if (!entry || typeof entry !== "object") {
+      return null;
+    }
+    return (
+      toPositiveInteger(entry?.nmId) ??
+      toPositiveInteger(entry?.nm_id) ??
+      toPositiveInteger(entry?.id) ??
+      toPositiveInteger(entry?.nmid)
+    );
+  }
+
   function mergeMarketSnapshots(primaryRaw, patchRaw) {
     const primary = primaryRaw && typeof primaryRaw === "object" ? primaryRaw : createEmptyMarketSnapshot();
     const patch = patchRaw && typeof patchRaw === "object" ? patchRaw : createEmptyMarketSnapshot();
@@ -206,12 +234,13 @@
 
   function extractMarketSnapshotFromCardV4(payload, nmIdRaw, source) {
     const snapshotSource = source || "card-v4";
-    const nmId = String(nmIdRaw || "");
+    const targetNmId = toPositiveInteger(nmIdRaw);
+    if (!Number.isInteger(targetNmId) || targetNmId <= 0) {
+      return createEmptyMarketSnapshot();
+    }
     const products = Array.isArray(payload?.products) ? payload.products : [];
-    const product =
-      products.find((item) => String(item?.id || item?.nmId || item?.nm_id || "") === nmId) ||
-      products[0] ||
-      null;
+    // Строгий матч по nmId: не берем products[0], чтобы не подмешивать чужой артикул.
+    const product = products.find((item) => extractNmIdFromEntry(item) === targetNmId) || null;
 
     if (!product || typeof product !== "object") {
       return createEmptyMarketSnapshot();
@@ -283,9 +312,21 @@
   }
 
   function extractStockFromProductOrderQntPayload(payload, nmIdRaw) {
-    const nmId = String(nmIdRaw || "");
+    const targetNmId = toPositiveInteger(nmIdRaw);
+    if (!Number.isInteger(targetNmId) || targetNmId <= 0) {
+      return {
+        stockValue: null,
+        inStock: null,
+      };
+    }
     const items = Array.isArray(payload) ? payload : [];
-    const item = items.find((entry) => String(entry?.nmId || entry?.id || "") === nmId) || items[0] || null;
+    const item = items.find((entry) => extractNmIdFromEntry(entry) === targetNmId) || null;
+    if (!item || typeof item !== "object") {
+      return {
+        stockValue: null,
+        inStock: null,
+      };
+    }
     const value = toFiniteNumber(item?.qnt ?? item?.qty ?? item?.quantity ?? item?.stock ?? item?.totalQuantity);
 
     if (value !== null) {

@@ -1,7 +1,7 @@
 const CLOUD_STATE_DEFAULT_KEY = "wb-dashboard-v2";
 const CLOUD_STATE_DEFAULT_ENDPOINT = "/api/state";
 const CLOUD_STATE_FETCH_TIMEOUT_MS = 9000;
-const CLOUD_STATE_SYNC_DEBOUNCE_MS = 900;
+const CLOUD_STATE_SYNC_DEBOUNCE_MS = 250;
 
 const cloudStateSync = {
   timer: 0,

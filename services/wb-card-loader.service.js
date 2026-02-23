@@ -652,6 +652,72 @@ function mergePriceIntoRow(row, price) {
   }
 }
 
+function isTrustedMarketSource(sourceRaw) {
+  const source = String(sourceRaw || "").trim().toLowerCase();
+  return source === "card-v4" || source === "card-v4-proxy";
+}
+
+function applyMarketStabilityGuard(payload, previousData, row) {
+  if (!payload || typeof payload !== "object") {
+    return;
+  }
+
+  const previous = previousData && typeof previousData === "object" ? previousData : null;
+  if (!previous) {
+    return;
+  }
+
+  if (!isTrustedMarketSource(payload.stockSource)) {
+    const previousStockValue = Number.isFinite(previous.stockValue)
+      ? Math.max(0, Math.round(previous.stockValue))
+      : Number.isFinite(row?.stockValue)
+        ? Math.max(0, Math.round(row.stockValue))
+        : null;
+    const previousInStock =
+      typeof previous.inStock === "boolean" ? previous.inStock : typeof row?.inStock === "boolean" ? row.inStock : null;
+
+    if (Number.isFinite(previousStockValue)) {
+      payload.stockValue = previousStockValue;
+      payload.inStock = previousStockValue > 0;
+    } else if (typeof previousInStock === "boolean") {
+      payload.stockValue = null;
+      payload.inStock = previousInStock;
+    }
+
+    payload.stockSource = String(previous.stockSource || row?.stockSource || payload.stockSource || "");
+  }
+
+  if (!isTrustedMarketSource(payload.priceSource)) {
+    const previousCurrentPrice = Number.isFinite(previous.currentPrice)
+      ? Math.max(0, Math.round(previous.currentPrice))
+      : Number.isFinite(row?.currentPrice)
+        ? Math.max(0, Math.round(row.currentPrice))
+        : null;
+    const previousBasePrice = Number.isFinite(previous.basePrice)
+      ? Math.max(0, Math.round(previous.basePrice))
+      : Number.isFinite(row?.basePrice)
+        ? Math.max(0, Math.round(row.basePrice))
+        : null;
+
+    if (Number.isFinite(previousCurrentPrice)) {
+      payload.currentPrice = previousCurrentPrice;
+    }
+    if (Number.isFinite(previousBasePrice)) {
+      payload.basePrice = previousBasePrice;
+    }
+
+    payload.priceSource = String(previous.priceSource || row?.priceSource || payload.priceSource || "");
+  }
+
+  if (!Number.isFinite(payload.rating) && Number.isFinite(previous.rating)) {
+    payload.rating = Math.round(Number(previous.rating) * 10) / 10;
+  }
+
+  if (!Number.isFinite(payload.reviewCount) && Number.isFinite(previous.reviewCount)) {
+    payload.reviewCount = Math.max(0, Math.round(previous.reviewCount));
+  }
+}
+
 async function loadRowsByIds(rowIds, options = {}) {
   const {
     loadingText = "Обновляю карточки",
@@ -928,10 +994,11 @@ async function loadRow(
       return;
     }
 
+    const targetPreviousData = target.data && typeof target.data === "object" ? target.data : null;
+    applyMarketStabilityGuard(payload, targetPreviousData, target);
+
     target.updatedAt = new Date().toISOString();
     target.error = "";
-
-    const targetPreviousData = target.data && typeof target.data === "object" ? target.data : null;
     target.data = payload;
 
     if (payload.supplierId) {
@@ -1031,6 +1098,7 @@ async function loadRow(
         mode,
       });
     }
+    persistState();
     render();
   }
 }
@@ -1461,8 +1529,10 @@ async function resolveBasketHost({ nmId, vol, part, forceProbe = false, requestS
   const cached = state.basketByVol[volKey];
 
   if (cached && !forceProbe) {
-    // Оптимистично используем кэш; перепроверка будет только при реальной ошибке загрузки.
-    return cached;
+    const alive = await checkHost(cached, nmId, vol, part, requestSignal, { fast: true });
+    if (alive) {
+      return cached;
+    }
   }
 
   const probeEnd = forceProbe ? Math.max(BASKET_END, 120) : BASKET_END;
