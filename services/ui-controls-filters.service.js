@@ -196,6 +196,7 @@ function syncGlobalFilterOffset() {
 
 function buildSellerSettingsHtml() {
   const settings = getSellerSettings();
+  const canManageSellerSettings = typeof hasAdminAccess === "function" ? hasAdminAccess() : true;
   const chips = settings
     .map(
       (seller) => `<div class="seller-chip">
@@ -206,8 +207,8 @@ function buildSellerSettingsHtml() {
     )
     .join("");
 
-  return `${chips}
-    <button
+  const addButtonHtml = canManageSellerSettings
+    ? `<button
       class="seller-chip seller-chip-action seller-settings-manage-btn"
       type="button"
       data-action="open-sellers-settings"
@@ -216,7 +217,11 @@ function buildSellerSettingsHtml() {
       title="Добавить кабинет"
     >
       <span class="seller-chip-plus" aria-hidden="true">+</span>
-    </button>`;
+    </button>`
+    : "";
+
+  return `${chips}
+    ${addButtonHtml}`;
 }
 
 function getAllCabinets(rows = state.rows, includeSellerSettings = true) {

@@ -901,6 +901,9 @@ function handlePresetActionsClick(event) {
   const sellersBtn = event.target.closest("[data-action='open-sellers-settings']");
   if (sellersBtn) {
     event.preventDefault();
+    if (typeof ensureAdminAccess === "function" && !ensureAdminAccess("Управление кабинетами")) {
+      return;
+    }
     openSellersModal();
     return;
   }
@@ -1123,6 +1126,9 @@ async function handleLoadProblematic() {
 }
 
 function openSellersModal() {
+  if (typeof hasAdminAccess === "function" && !hasAdminAccess()) {
+    return;
+  }
   if (!el.sellersModal) {
     return;
   }
@@ -1142,6 +1148,7 @@ function renderSellersModalContent() {
     return;
   }
 
+  const canManageSellerSettings = typeof hasAdminAccess === "function" ? hasAdminAccess() : true;
   const settings = getSellerSettings();
   const reservedSupplierIds = new Set(
     (Array.isArray(DEFAULT_SELLER_SETTINGS) ? DEFAULT_SELLER_SETTINGS : [])
@@ -1155,7 +1162,9 @@ function renderSellersModalContent() {
             (item) => {
               const supplierId = normalizeSupplierId(item?.supplierId || "");
               const isReserved = supplierId ? reservedSupplierIds.has(supplierId) : false;
-              const removeControl = isReserved
+              const removeControl = !canManageSellerSettings
+                ? ""
+                : isReserved
                 ? '<span class="seller-settings-reserved-label">Зарезервирован</span>'
                 : `<button
           class="btn btn-mini btn-danger seller-settings-remove-btn"
@@ -1179,9 +1188,8 @@ function renderSellersModalContent() {
           .join("")
       : '<div class="recommendation-empty">Список кабинетов пуст.</div>';
 
-  el.sellersContent.innerHTML = `
-    <div class="seller-settings-list">${rowsHtml}</div>
-    <form class="seller-settings-form" data-action="add-seller-form">
+  const formHtml = canManageSellerSettings
+    ? `<form class="seller-settings-form" data-action="add-seller-form">
       <label class="field">
         <span>Название кабинета</span>
         <input name="cabinetName" type="text" required placeholder="Например: Паша 3" maxlength="64" />
@@ -1200,11 +1208,21 @@ function renderSellersModalContent() {
         <button class="btn btn-primary" type="submit">Добавить кабинет</button>
         <button class="btn btn-mini" type="button" data-action="reset-seller-settings">Сбросить к дефолту</button>
       </div>
-    </form>
+    </form>`
+    : "";
+
+  el.sellersContent.innerHTML = `
+    <div class="seller-settings-list">${rowsHtml}</div>
+    ${formHtml}
   `;
 }
 
 function handleSellerSettingsSubmit(event) {
+  if (typeof ensureAdminAccess === "function" && !ensureAdminAccess("Управление кабинетами")) {
+    event.preventDefault();
+    return;
+  }
+
   const form = event.target?.closest?.("form[data-action='add-seller-form']");
   if (!form) {
     return;
@@ -1258,6 +1276,9 @@ function handleSellerSettingsSubmit(event) {
 function handleSellerSettingsClick(event) {
   const removeBtn = event.target?.closest?.("[data-action='remove-seller-setting']");
   if (removeBtn) {
+    if (typeof ensureAdminAccess === "function" && !ensureAdminAccess("Управление кабинетами")) {
+      return;
+    }
     const supplierId = normalizeSupplierId(removeBtn.dataset.supplierId || "");
     if (!supplierId) {
       return;
@@ -1286,6 +1307,9 @@ function handleSellerSettingsClick(event) {
 
   const resetBtn = event.target?.closest?.("[data-action='reset-seller-settings']");
   if (resetBtn) {
+    if (typeof ensureAdminAccess === "function" && !ensureAdminAccess("Управление кабинетами")) {
+      return;
+    }
     state.sellerSettings = createDefaultSellerSettings();
     for (const row of state.rows) {
       const cabinet = getCabinetBySupplierId(row?.supplierId);
