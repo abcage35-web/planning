@@ -575,6 +575,9 @@ function setBulkLoading(isLoading, loadingText = "Обновляю карточ�
 function syncButtonState() {
   const disabled = state.isBulkLoading;
   el.loadAllBtn.disabled = disabled;
+  if (el.downloadExportBtn) {
+    el.downloadExportBtn.disabled = disabled;
+  }
   if (el.loadProblemBtn) {
     const hasProblems = getProblemRowIds().length > 0;
     el.loadProblemBtn.disabled = disabled || !hasProblems;

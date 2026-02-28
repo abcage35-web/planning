@@ -1863,6 +1863,17 @@ function renderRowHistoryContent(row, logsRaw) {
       const sourceLabel = entry.source === "system" ? "Системное" : "Ручное";
       const modeLabel = getModeLabel(entry.mode);
       const actionLabel = getActionLabel(entry.actionKey);
+      const actorLogin = String(entry.actorLogin || "").trim();
+      const actorIp = String(entry.actorIp || "").trim();
+      const actorRole = String(entry.actorRole || "").trim();
+      const actorParts = [];
+      if (actorLogin) {
+        actorParts.push(actorRole ? `${actorLogin} (${actorRole})` : actorLogin);
+      }
+      if (actorIp) {
+        actorParts.push(`IP: ${actorIp}`);
+      }
+      const actorMeta = actorParts.length > 0 ? ` · ${actorParts.join(" · ")}` : "";
       const changesHtml =
         visibleChanges.length > 0
           ? `<ul class="row-history-changes">
@@ -1882,7 +1893,7 @@ function renderRowHistoryContent(row, logsRaw) {
       return `<article class="row-history-item${statusClass}">
         <div class="row-history-head">
           <span class="row-history-time">${escapeHtml(formatDateTime(entry.at))}</span>
-          <span class="row-history-meta">${escapeHtml(`${sourceLabel} · ${actionLabel} · ${modeLabel}`)}</span>
+          <span class="row-history-meta">${escapeHtml(`${sourceLabel} · ${actionLabel} · ${modeLabel}${actorMeta}`)}</span>
           <span class="row-history-status">${escapeHtml(statusLabel)}</span>
         </div>
         ${changesHtml}

@@ -1003,6 +1003,39 @@ async function handleLoadAll() {
   });
 }
 
+async function handleDownloadExport() {
+  if (!el.downloadExportBtn) {
+    return;
+  }
+
+  const initialLabel = "Скачать таблицу";
+  el.downloadExportBtn.disabled = true;
+  if (typeof setStaticButtonIcon === "function") {
+    setStaticButtonIcon(el.downloadExportBtn, "download", "Формирую CSV...");
+  } else {
+    el.downloadExportBtn.textContent = "Формирую CSV...";
+  }
+
+  try {
+    if (typeof downloadCloudStateExport !== "function") {
+      window.alert("Экспорт недоступен: API экспорта не подключен.");
+      return;
+    }
+
+    const ok = await downloadCloudStateExport();
+    if (!ok) {
+      window.alert("Не удалось скачать таблицу. Проверьте авторизацию и доступ к API.");
+    }
+  } finally {
+    if (typeof setStaticButtonIcon === "function") {
+      setStaticButtonIcon(el.downloadExportBtn, "download", initialLabel);
+    } else {
+      el.downloadExportBtn.textContent = initialLabel;
+    }
+    el.downloadExportBtn.disabled = state.isBulkLoading === true;
+  }
+}
+
 async function loadFilteredRowsByMode({ loadingText = "Обновляю карточки" }) {
   const filteredRows = applyFilters(state.rows);
   if (filteredRows.length === 0) {

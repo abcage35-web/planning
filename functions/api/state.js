@@ -1,33 +1,31 @@
 import { getSessionFromRequest, json } from "./_lib/auth.js";
+import {
+  DEFAULT_STATE_KEY,
+  ensureStateTables,
+  errorJson,
+  getClientIp,
+  getStateKeyFromUrl,
+  getStateRowsCount,
+  loadDashboardState,
+  saveDashboardState,
+} from "./_lib/state-store.js";
 
-const DEFAULT_STATE_KEY = "wb-dashboard-v2";
-const MAX_PAYLOAD_BYTES = 1024 * 1024;
-
-function getStateKeyFromUrl(url) {
-  const key = String(url.searchParams.get("key") || "").trim();
+function getStateKeyFromBody(bodyRaw) {
+  const body = bodyRaw && typeof bodyRaw === "object" ? bodyRaw : {};
+  const key = String(body.key || "").trim();
   return key || DEFAULT_STATE_KEY;
 }
 
-function parsePayloadSize(payload) {
-  try {
-    const encoded = new TextEncoder().encode(JSON.stringify(payload));
-    return encoded.byteLength;
-  } catch {
-    return Number.POSITIVE_INFINITY;
-  }
-}
-
-function parsePayloadJson(payloadJsonRaw) {
-  const payloadJson = String(payloadJsonRaw || "").trim();
-  if (!payloadJson) {
+function getPayloadFromBody(bodyRaw) {
+  const body = bodyRaw && typeof bodyRaw === "object" ? bodyRaw : null;
+  if (!body || typeof body !== "object") {
     return null;
   }
-  try {
-    const parsed = JSON.parse(payloadJson);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
-  } catch {
+  const payload = body.payload;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return null;
   }
+  return payload;
 }
 
 function getRowsCount(payloadRaw) {
@@ -47,41 +45,28 @@ export async function onRequestGet(context) {
   if (!env?.DB) {
     return json({ ok: false, error: "D1 binding DB is not configured" }, { status: 500 });
   }
+
   const session = await getSessionFromRequest(request, env);
   if (!session) {
     return json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const url = new URL(request.url);
-  const key = getStateKeyFromUrl(url);
-
-  const row = await env.DB.prepare(
-    `SELECT state_key, payload_json, saved_at, updated_at
-     FROM dashboard_state
-     WHERE state_key = ?1
-     LIMIT 1`,
-  )
-    .bind(key)
-    .first();
-
-  if (!row) {
-    return json({ ok: true, key, payload: null, savedAt: null, updatedAt: null });
-  }
-
-  let payload = null;
   try {
-    payload = JSON.parse(String(row.payload_json || "null"));
-  } catch {
-    payload = null;
-  }
+    await ensureStateTables(env.DB);
+    const url = new URL(request.url);
+    const key = getStateKeyFromUrl(url);
+    const state = await loadDashboardState(env.DB, key);
 
-  return json({
-    ok: true,
-    key,
-    payload,
-    savedAt: String(row.saved_at || "") || null,
-    updatedAt: String(row.updated_at || "") || null,
-  });
+    return json({
+      ok: true,
+      key,
+      payload: state.payload,
+      savedAt: state.savedAt,
+      updatedAt: state.updatedAt,
+    });
+  } catch (error) {
+    return errorJson(error, "Не удалось загрузить состояние");
+  }
 }
 
 export async function onRequestPut(context) {
@@ -89,6 +74,7 @@ export async function onRequestPut(context) {
   if (!env?.DB) {
     return json({ ok: false, error: "D1 binding DB is not configured" }, { status: 500 });
   }
+
   const session = await getSessionFromRequest(request, env);
   if (!session) {
     return json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -101,64 +87,60 @@ export async function onRequestPut(context) {
     return json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const keyRaw = body && typeof body === "object" ? body.key : "";
-  const key = String(keyRaw || "").trim() || DEFAULT_STATE_KEY;
-  const payload = body && typeof body === "object" ? body.payload : null;
-
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+  const key = getStateKeyFromBody(body);
+  const payload = getPayloadFromBody(body);
+  if (!payload) {
     return json({ ok: false, error: "payload must be an object" }, { status: 400 });
   }
 
-  const payloadBytes = parsePayloadSize(payload);
-  if (!Number.isFinite(payloadBytes) || payloadBytes > MAX_PAYLOAD_BYTES) {
-    return json({ ok: false, error: "payload is too large" }, { status: 413 });
-  }
+  try {
+    await ensureStateTables(env.DB);
 
-  const currentRow = await env.DB.prepare(
-    `SELECT payload_json
-     FROM dashboard_state
-     WHERE state_key = ?1
-     LIMIT 1`,
-  )
-    .bind(key)
-    .first();
-  const currentPayload = parsePayloadJson(currentRow?.payload_json || "");
-  const currentRowsCount = getRowsCount(currentPayload);
-  const nextRowsCount = getRowsCount(payload);
-  const role = String(session?.user?.role || "").trim().toLowerCase();
-  const isAdmin = role === "admin";
+    const currentRowsCount = await getStateRowsCount(env.DB, key);
+    const nextRowsCount = getRowsCount(payload);
+    const role = String(session?.user?.role || "").trim().toLowerCase();
+    const isAdmin = role === "admin";
 
-  if (nextRowsCount !== currentRowsCount && !isAdmin) {
-    return json(
-      { ok: false, error: "Only admin can add or remove products." },
-      { status: 403 },
-    );
-  }
+    if (nextRowsCount !== currentRowsCount && !isAdmin) {
+      return json(
+        { ok: false, error: "Only admin can add or remove products." },
+        { status: 403 },
+      );
+    }
 
-  if (currentRowsCount > 1 && nextRowsCount === 0) {
-    return json(
-      {
-        ok: false,
-        error: "Full clear is blocked. Delete products one by one.",
+    if (currentRowsCount > 1 && nextRowsCount === 0) {
+      return json(
+        {
+          ok: false,
+          error: "Full clear is blocked. Delete products one by one.",
+        },
+        { status: 409 },
+      );
+    }
+
+    const saved = await saveDashboardState(env.DB, {
+      stateKey: key,
+      payload,
+      actorUserId: session?.user?.id,
+      actorLogin: session?.user?.login,
+      actorRole: session?.user?.role,
+      actorIp: getClientIp(request),
+    });
+
+    return json({
+      ok: true,
+      key: saved.key,
+      savedAt: saved.savedAt,
+      updatedAt: saved.updatedAt,
+      stats: {
+        rowsTotal: saved.rowsTotal,
+        rowsChanged: saved.rowsChanged,
+        rowsDeleted: saved.rowsDeleted,
+        logsUpserted: saved.logsUpserted,
+        payloadBytes: saved.payloadBytes,
       },
-      { status: 409 },
-    );
+    });
+  } catch (error) {
+    return errorJson(error, "Не удалось сохранить состояние");
   }
-
-  const nowIso = new Date().toISOString();
-  const savedAt = String(payload.savedAt || "").trim() || nowIso;
-  const payloadJson = JSON.stringify(payload);
-
-  await env.DB.prepare(
-    `INSERT INTO dashboard_state (state_key, payload_json, saved_at, updated_at)
-     VALUES (?1, ?2, ?3, ?4)
-     ON CONFLICT(state_key) DO UPDATE SET
-       payload_json = excluded.payload_json,
-       saved_at = excluded.saved_at,
-       updated_at = excluded.updated_at`,
-  )
-    .bind(key, payloadJson, savedAt, nowIso)
-    .run();
-
-  return json({ ok: true, key, savedAt, updatedAt: nowIso });
 }

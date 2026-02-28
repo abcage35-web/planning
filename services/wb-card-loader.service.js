@@ -79,6 +79,9 @@ function normalizeRowUpdateLogEntry(raw) {
     actionKey,
     status,
     error,
+    actorLogin: String(raw.actorLogin || raw.actor_login || "").trim().slice(0, 80),
+    actorRole: String(raw.actorRole || raw.actor_role || "").trim().slice(0, 40),
+    actorIp: String(raw.actorIp || raw.actor_ip || "").trim().slice(0, 64),
     changes,
   };
 }

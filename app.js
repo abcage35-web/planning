@@ -155,6 +155,9 @@ const ICON_LIBRARY = {
   chartLine: {
     paths: ["M3 3v18h18", "m7 14 4-4 3 3 4-6"],
   },
+  download: {
+    paths: ["M12 3v12", "m7 10 5 5 5-5", "M5 21h14"],
+  },
   eye: {
     paths: [
       "M2.05 12a10.95 10.95 0 0 1 19.9 0 10.95 10.95 0 0 1-19.9 0",
@@ -307,6 +310,7 @@ const el = {
   addSingleBtn: document.getElementById("addSingleBtn"),
   addBulkBtn: document.getElementById("addBulkBtn"),
   loadAllBtn: document.getElementById("loadAllBtn"),
+  downloadExportBtn: document.getElementById("downloadExportBtn"),
   loadProblemBtn: document.getElementById("loadProblemBtn"),
   clearBtn: document.getElementById("clearBtn"),
   filtersRow: document.getElementById("filtersRow"),
@@ -414,6 +418,7 @@ function hydrateStaticIcons() {
   setStaticButtonIcon(el.previewPrevBtn, "chevronLeft");
   setStaticButtonIcon(el.previewNextBtn, "chevronRight");
   setStaticButtonIcon(el.logoutBtn, "logOut");
+  setStaticButtonIcon(el.downloadExportBtn, "download", "Скачать таблицу");
   syncAuthPasswordToggleIcon();
 }
 
@@ -736,6 +741,9 @@ function bindEvents() {
   }
   el.addBulkBtn.addEventListener("click", handleAddBulk);
   el.loadAllBtn.addEventListener("click", handleLoadAll);
+  if (el.downloadExportBtn) {
+    el.downloadExportBtn.addEventListener("click", handleDownloadExport);
+  }
   if (el.loadProblemBtn) {
     el.loadProblemBtn.addEventListener("click", handleLoadProblematic);
   }

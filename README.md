@@ -26,8 +26,18 @@ python3 -m http.server 4173
 
 В проект добавлены:
 - API-функция: `functions/api/state.js` (`GET/PUT /api/state`);
+- API-функция экспорта: `functions/api/state-export.js` (`GET /api/state-export?key=...`, CSV);
+- API-функция rollback: `functions/api/state-rollback.js` (`POST /api/state-rollback`, admin only);
 - API-функции авторизации: `functions/api/auth/login.js`, `functions/api/auth/me.js`, `functions/api/auth/logout.js`;
 - SQL-схема D1: `cloudflare/d1/schema.sql`.
+
+Архитектура хранения в D1:
+- `dashboard_rows_current` — текущее состояние по каждой строке товара (1 товар = 1 строка);
+- `dashboard_row_versions` — версионирование строк для отката;
+- `dashboard_row_logs` — логи обновлений по строкам;
+- `dashboard_problem_snapshots` — история срезов проблем для графика;
+- `dashboard_state_meta` — метаданные UI-состояния без тяжелого массива `rows`;
+- `dashboard_save_events` — события сохранения (включая `actor_ip`).
 
 Чтобы данные не пропадали после очистки браузера:
 
