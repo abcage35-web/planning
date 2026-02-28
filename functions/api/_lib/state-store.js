@@ -862,7 +862,7 @@ export async function ensureStateTables(db) {
     return;
   }
 
-  await db.exec(`
+  const schemaSql = `
     CREATE TABLE IF NOT EXISTS dashboard_state_meta (
       state_key TEXT PRIMARY KEY,
       meta_json TEXT NOT NULL,
@@ -1050,7 +1050,16 @@ export async function ensureStateTables(db) {
 
     CREATE INDEX IF NOT EXISTS idx_dashboard_save_events_saved_at
       ON dashboard_save_events(state_key, saved_at);
-  `);
+  `;
+
+  const statements = String(schemaSql)
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  for (const statement of statements) {
+    await db.exec(statement);
+  }
 
   tablesEnsured = true;
 }
