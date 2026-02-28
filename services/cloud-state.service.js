@@ -118,10 +118,31 @@ function getCloudRowKey(rowRaw, index) {
 
 function getCloudRowSignature(rowRaw, index) {
   const row = rowRaw && typeof rowRaw === "object" ? rowRaw : {};
+  const latestLog =
+    Array.isArray(row.updateLogs) && row.updateLogs.length > 0
+      ? row.updateLogs[row.updateLogs.length - 1]
+      : null;
+  const latestLogId =
+    latestLog && typeof latestLog === "object"
+      ? String(latestLog.id || latestLog.logId || latestLog.at || "").trim()
+      : "";
   try {
     return JSON.stringify({
       sortIndex: Math.max(0, Math.round(Number(index) || 0)),
-      row,
+      id: String(row.id || "").trim(),
+      nmId: String(row.nmId || "").trim(),
+      cabinet: String(row.cabinet || "").trim(),
+      supplierId: String(row.supplierId || "").trim(),
+      stockValue: Number.isFinite(Number(row.stockValue)) ? Math.round(Number(row.stockValue)) : null,
+      inStock: typeof row.inStock === "boolean" ? row.inStock : null,
+      stockSource: String(row.stockSource || "").trim(),
+      currentPrice: Number.isFinite(Number(row.currentPrice)) ? Math.round(Number(row.currentPrice)) : null,
+      basePrice: Number.isFinite(Number(row.basePrice)) ? Math.round(Number(row.basePrice)) : null,
+      priceSource: String(row.priceSource || "").trim(),
+      error: String(row.error || "").trim(),
+      updatedAt: String(row.updatedAt || "").trim(),
+      data: row.data && typeof row.data === "object" ? row.data : null,
+      latestLogId,
     });
   } catch {
     return `${getCloudRowKey(rowRaw, index)}-${Date.now()}`;
@@ -130,10 +151,15 @@ function getCloudRowSignature(rowRaw, index) {
 
 function getCloudMetaFromPayload(payloadRaw) {
   const payload = payloadRaw && typeof payloadRaw === "object" ? payloadRaw : {};
-  const meta = { ...payload };
-  delete meta.rows;
-  delete meta.updateSnapshots;
-  return meta;
+  // В облаке храним только реально нужные для общего состояния настройки.
+  // Локальные UI-фильтры/кэши не синхронизируем: это резко снижает лишние PATCH-записи.
+  return {
+    autoplayLimitPerCabinet: payload.autoplayLimitPerCabinet,
+    autoplayLimitByCabinet: payload.autoplayLimitByCabinet,
+    tagsLimitPerCabinet: payload.tagsLimitPerCabinet,
+    tagsLimitByCabinet: payload.tagsLimitByCabinet,
+    sellerSettings: payload.sellerSettings,
+  };
 }
 
 function getCloudMetaSignature(metaRaw) {

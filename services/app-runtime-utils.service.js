@@ -499,11 +499,21 @@ function setBulkLoading(isLoading, loadingText = "Обновляю карточ�
   const meta = progressMeta && typeof progressMeta === "object" ? progressMeta : {};
 
   if (el.loadAllBtn) {
-    el.loadAllBtn.textContent = state.isBulkLoading && actionKey === "all" ? loadingText : labels.all;
+    const loadAllLabel = state.isBulkLoading && actionKey === "all" ? loadingText : labels.all;
+    if (typeof setStaticButtonIcon === "function") {
+      setStaticButtonIcon(el.loadAllBtn, "refresh", loadAllLabel);
+    } else {
+      el.loadAllBtn.textContent = loadAllLabel;
+    }
   }
   if (!state.isBulkLoading && el.loadProblemBtn) {
     const hasProblems = getProblemRowIds().length;
-    el.loadProblemBtn.textContent = hasProblems > 0 ? `${labels.problem} (${hasProblems})` : labels.problem;
+    const loadProblemLabel = hasProblems > 0 ? `${labels.problem} (${hasProblems})` : labels.problem;
+    if (typeof setStaticButtonIcon === "function") {
+      setStaticButtonIcon(el.loadProblemBtn, "refresh", loadProblemLabel);
+    } else {
+      el.loadProblemBtn.textContent = loadProblemLabel;
+    }
   }
 
   if (isLoading) {

@@ -28,7 +28,12 @@ function renderSummary() {
     }
   }
   if (el.loadProblemBtn) {
-    el.loadProblemBtn.textContent = errors > 0 ? `Обновить проблемные (${errors})` : "Обновить проблемные";
+    const problemBtnLabel = errors > 0 ? `Обновить проблемные (${errors})` : "Обновить проблемные";
+    if (typeof setStaticButtonIcon === "function") {
+      setStaticButtonIcon(el.loadProblemBtn, "refresh", problemBtnLabel);
+    } else {
+      el.loadProblemBtn.textContent = problemBtnLabel;
+    }
   }
 
   const problemStats = getProblemStats(dashboardRows);

@@ -6,8 +6,71 @@ const ROW_LOG_LIMIT = 320;
 const ROW_VERSION_LIMIT = 500;
 const DASHBOARD_SAVE_EVENT_LIMIT = 2000;
 const CSV_SEPARATOR = ",";
+const WRITE_UPSERT_ROW_VERSIONS = false;
+const WRITE_LEGACY_STATE_ON_SAVE = false;
+const TOUCH_ARTICLE_REGISTRY_ON_UPDATE = false;
+const WRITE_SAVE_EVENTS = false;
 
 let tablesEnsured = false;
+let tablesEnsurePromise = null;
+const compactedStateKeys = new Set();
+
+const REQUIRED_TABLES = [
+  "dashboard_state",
+  "dashboard_state_meta",
+  "dashboard_rows_current",
+  "dashboard_article_registry",
+  "dashboard_row_versions",
+  "dashboard_row_logs",
+  "dashboard_problem_snapshots",
+  "dashboard_save_events",
+];
+
+async function maybeCompactStateStorage(db, stateKey, savedAtIso, nowIso) {
+  const key = safeString(stateKey, 120) || DEFAULT_STATE_KEY;
+  if (!key || compactedStateKeys.has(key)) {
+    return;
+  }
+
+  await db
+    .prepare(
+      `UPDATE dashboard_rows_current
+       SET row_payload_json = NULL
+       WHERE state_key = ?1
+         AND row_payload_json IS NOT NULL`,
+    )
+    .bind(key)
+    .run();
+
+  if (!WRITE_SAVE_EVENTS) {
+    await db
+      .prepare(
+        `DELETE FROM dashboard_save_events
+         WHERE state_key = ?1`,
+      )
+      .bind(key)
+      .run();
+  }
+
+  if (!WRITE_LEGACY_STATE_ON_SAVE) {
+    const compactPayload = {
+      savedAt: toIsoOrNow(savedAtIso, nowIso),
+      lastSyncAt: toIsoOrNow(savedAtIso, nowIso),
+      compact: true,
+      updatedAt: toIsoOrNow(nowIso, new Date().toISOString()),
+    };
+    await db.prepare(UPSERT_LEGACY_STATE_SQL)
+      .bind(
+        key,
+        JSON.stringify(compactPayload),
+        toIsoOrNow(savedAtIso, nowIso),
+        toIsoOrNow(nowIso, new Date().toISOString()),
+      )
+      .run();
+  }
+
+  compactedStateKeys.add(key);
+}
 
 export function getStateKeyFromUrl(url) {
   const key = String(url.searchParams.get("key") || "").trim();
@@ -464,7 +527,9 @@ async function normalizeRowForStorage(rowRaw, sortIndex, actor, savedAtIso) {
     reviewCount: toIntegerOrNull(rowData?.reviewCount),
     marketError: safeString(rowData?.marketError, 2000),
     rowDataJson: toJson(normalizedData, "null"),
-    rowPayloadJson: toJson(rowForHash, "{}"),
+    // Для текущего состояния храним полный row_data_json.
+    // Дублирующий row_payload_json intentionally не сохраняем (экономия хранилища).
+    rowPayloadJson: null,
     rowHash,
     lastSavedAt: savedAtIso,
     createdAt: savedAtIso,
@@ -660,6 +725,37 @@ async function getLatestRowLogIds(db, stateKey) {
     const rowId = safeString(row.row_id, 120);
     const logId = safeString(row.log_id, 120);
     if (!rowId || !logId) {
+      continue;
+    }
+    latestByRowId.set(rowId, logId);
+  }
+  return latestByRowId;
+}
+
+async function getLatestRowLogIdsForRows(db, stateKey, rowIdsRaw) {
+  const rowIds = normalizeRowIdList(rowIdsRaw);
+  if (rowIds.length <= 0) {
+    return new Map();
+  }
+
+  const placeholders = rowIds.map((_, index) => `?${index + 2}`).join(", ");
+  const sql = `SELECT row_id, log_id
+    FROM dashboard_row_logs
+    WHERE state_key = ?1
+      AND row_id IN (${placeholders})
+    ORDER BY row_id ASC, at DESC, log_id DESC`;
+
+  const result = await db
+    .prepare(sql)
+    .bind(stateKey, ...rowIds)
+    .all();
+
+  const rows = Array.isArray(result?.results) ? result.results : [];
+  const latestByRowId = new Map();
+  for (const row of rows) {
+    const rowId = safeString(row.row_id, 120);
+    const logId = safeString(row.log_id, 120);
+    if (!rowId || !logId || latestByRowId.has(rowId)) {
       continue;
     }
     latestByRowId.set(rowId, logId);
@@ -923,7 +1019,40 @@ export async function ensureStateTables(db) {
     return;
   }
 
-  const schemaSql = `
+  if (!tablesEnsurePromise) {
+    tablesEnsurePromise = (async () => {
+      const placeholders = REQUIRED_TABLES.map((_, index) => `?${index + 1}`).join(", ");
+      const checkSql = `SELECT name
+        FROM sqlite_master
+        WHERE type = 'table'
+          AND name IN (${placeholders})`;
+      const checkResult = await db
+        .prepare(checkSql)
+        .bind(...REQUIRED_TABLES)
+        .all();
+      const existingNames = new Set(
+        Array.isArray(checkResult?.results)
+          ? checkResult.results.map((row) => safeString(row?.name, 120)).filter(Boolean)
+          : [],
+      );
+
+      const hasAllTables = REQUIRED_TABLES.every((tableName) => existingNames.has(tableName));
+      if (hasAllTables) {
+        tablesEnsured = true;
+        return;
+      }
+
+      const schemaSql = `
+    CREATE TABLE IF NOT EXISTS dashboard_state (
+      state_key TEXT PRIMARY KEY,
+      payload_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_dashboard_state_updated_at
+      ON dashboard_state(updated_at);
+
     CREATE TABLE IF NOT EXISTS dashboard_state_meta (
       state_key TEXT PRIMARY KEY,
       meta_json TEXT NOT NULL,
@@ -1128,20 +1257,31 @@ export async function ensureStateTables(db) {
       ON dashboard_save_events(state_key, saved_at);
   `;
 
-  const statements = String(schemaSql)
-    .split(";")
-    .map((part) => part.trim())
-    .filter(Boolean);
+      const statements = String(schemaSql)
+        .split(";")
+        .map((part) => part.trim())
+        .filter(Boolean);
 
-  for (const statement of statements) {
-    const singleLine = statement.replace(/\s+/g, " ").trim();
-    if (!singleLine) {
-      continue;
-    }
-    await db.exec(singleLine);
+      for (const statement of statements) {
+        const singleLine = statement.replace(/\s+/g, " ").trim();
+        if (!singleLine) {
+          continue;
+        }
+        await db.exec(singleLine);
+      }
+
+      tablesEnsured = true;
+    })()
+      .catch((error) => {
+        tablesEnsured = false;
+        throw error;
+      })
+      .finally(() => {
+        tablesEnsurePromise = null;
+      });
   }
 
-  tablesEnsured = true;
+  await tablesEnsurePromise;
 }
 
 async function getCurrentRowsMap(db, stateKey) {
@@ -1160,6 +1300,43 @@ async function getCurrentRowsMap(db, stateKey) {
     byId.set(String(row.row_id || ""), row);
   }
   return byId;
+}
+
+async function getCurrentRowsMapByIds(db, stateKey, rowIdsRaw) {
+  const rowIds = normalizeRowIdList(rowIdsRaw);
+  if (rowIds.length <= 0) {
+    return new Map();
+  }
+
+  const placeholders = rowIds.map((_, index) => `?${index + 2}`).join(", ");
+  const sql = `SELECT *
+    FROM dashboard_rows_current
+    WHERE state_key = ?1
+      AND row_id IN (${placeholders})`;
+
+  const result = await db
+    .prepare(sql)
+    .bind(stateKey, ...rowIds)
+    .all();
+
+  const rows = Array.isArray(result?.results) ? result.results : [];
+  const byId = new Map();
+  for (const row of rows) {
+    byId.set(String(row.row_id || ""), row);
+  }
+  return byId;
+}
+
+async function getMaxSortIndex(db, stateKey) {
+  const row = await db
+    .prepare(
+      `SELECT MAX(sort_index) AS max_sort_index
+       FROM dashboard_rows_current
+       WHERE state_key = ?1`,
+    )
+    .bind(stateKey)
+    .first();
+  return Math.max(0, Number(row?.max_sort_index) || 0);
 }
 
 export async function getStateRowsCount(db, stateKey) {
@@ -1381,13 +1558,13 @@ async function pruneRowVersions(db, stateKey, rowId) {
   await db
     .prepare(
       `DELETE FROM dashboard_row_versions
-       WHERE version_id IN (
-         SELECT version_id
-         FROM dashboard_row_versions
-         WHERE state_key = ?1 AND row_id = ?2
-         ORDER BY version_id DESC
-         LIMIT -1 OFFSET ?3
-       )`,
+       WHERE state_key = ?1
+         AND row_id = ?2
+         AND rowid <= (
+           SELECT COALESCE(MAX(rowid), 0) - ?3
+           FROM dashboard_row_versions
+           WHERE state_key = ?1 AND row_id = ?2
+         )`,
     )
     .bind(stateKey, rowId, ROW_VERSION_LIMIT)
     .run();
@@ -1397,13 +1574,13 @@ async function pruneRowLogs(db, stateKey, rowId) {
   await db
     .prepare(
       `DELETE FROM dashboard_row_logs
-       WHERE rowid IN (
-         SELECT rowid
-         FROM dashboard_row_logs
-         WHERE state_key = ?1 AND row_id = ?2
-         ORDER BY at DESC, log_id DESC
-         LIMIT -1 OFFSET ?3
-       )`,
+       WHERE state_key = ?1
+         AND row_id = ?2
+         AND rowid <= (
+           SELECT COALESCE(MAX(rowid), 0) - ?3
+           FROM dashboard_row_logs
+           WHERE state_key = ?1 AND row_id = ?2
+         )`,
     )
     .bind(stateKey, rowId, ROW_LOG_LIMIT)
     .run();
@@ -1413,13 +1590,12 @@ async function pruneSnapshots(db, stateKey) {
   await db
     .prepare(
       `DELETE FROM dashboard_problem_snapshots
-       WHERE rowid IN (
-         SELECT rowid
-         FROM dashboard_problem_snapshots
-         WHERE state_key = ?1
-         ORDER BY at DESC, snapshot_id DESC
-         LIMIT -1 OFFSET ?2
-       )`,
+       WHERE state_key = ?1
+         AND rowid <= (
+           SELECT COALESCE(MAX(rowid), 0) - ?2
+           FROM dashboard_problem_snapshots
+           WHERE state_key = ?1
+         )`,
     )
     .bind(stateKey, SNAPSHOT_LIMIT)
     .run();
@@ -1429,13 +1605,12 @@ async function pruneSaveEvents(db, stateKey) {
   await db
     .prepare(
       `DELETE FROM dashboard_save_events
-       WHERE event_id IN (
-         SELECT event_id
-         FROM dashboard_save_events
-         WHERE state_key = ?1
-         ORDER BY event_id DESC
-         LIMIT -1 OFFSET ?2
-       )`,
+       WHERE state_key = ?1
+         AND event_id <= (
+           SELECT COALESCE(MAX(event_id), 0) - ?2
+           FROM dashboard_save_events
+           WHERE state_key = ?1
+         )`,
     )
     .bind(stateKey, DASHBOARD_SAVE_EVENT_LIMIT)
     .run();
@@ -1516,17 +1691,19 @@ export async function saveDashboardState(db, input = {}) {
       )
       .run();
 
-    const legacyCompactPayload = {
-      savedAt: savedAtIso,
-      lastSyncAt: safeString(payload.lastSyncAt, 100) || savedAtIso,
-      rowsCount: normalizedRows.length,
-      migrated: true,
-      updatedAt: nowIso,
-    };
+    if (WRITE_LEGACY_STATE_ON_SAVE) {
+      const legacyCompactPayload = {
+        savedAt: savedAtIso,
+        lastSyncAt: safeString(payload.lastSyncAt, 100) || savedAtIso,
+        rowsCount: normalizedRows.length,
+        migrated: true,
+        updatedAt: nowIso,
+      };
 
-    await db.prepare(UPSERT_LEGACY_STATE_SQL)
-      .bind(stateKey, JSON.stringify(legacyCompactPayload), savedAtIso, nowIso)
-      .run();
+      await db.prepare(UPSERT_LEGACY_STATE_SQL)
+        .bind(stateKey, JSON.stringify(legacyCompactPayload), savedAtIso, nowIso)
+        .run();
+    }
 
     for (const row of normalizedRows) {
       const existing = existingRowsById.get(row.rowId) || null;
@@ -1538,7 +1715,7 @@ export async function saveDashboardState(db, input = {}) {
           .bind(...mapNormalizedRowToCurrentBind(row, existing?.created_at || null))
           .run();
 
-        if (row.nmId) {
+        if (row.nmId && (!existing || TOUCH_ARTICLE_REGISTRY_ON_UPDATE)) {
           await db.prepare(UPSERT_ARTICLE_REGISTRY_SQL)
             .bind(
               stateKey,
@@ -1555,9 +1732,11 @@ export async function saveDashboardState(db, input = {}) {
 
         rowsChanged += 1;
         changedRowIds.add(row.rowId);
-        await db.prepare(INSERT_ROW_VERSION_SQL)
-          .bind(...mapNormalizedRowToVersionBind(row, "upsert", actor, nowIso))
-          .run();
+        if (WRITE_UPSERT_ROW_VERSIONS) {
+          await db.prepare(INSERT_ROW_VERSION_SQL)
+            .bind(...mapNormalizedRowToVersionBind(row, "upsert", actor, nowIso))
+            .run();
+        }
       }
 
       const latestIncomingLog = row.logs.length > 0 ? row.logs[row.logs.length - 1] : null;
@@ -1587,9 +1766,11 @@ export async function saveDashboardState(db, input = {}) {
       rowsDeleted += 1;
       changedRowIds.add(rowId);
 
-      await db.prepare(INSERT_ROW_VERSION_SQL)
-        .bind(...mapCurrentRowToVersionBind(existing, "delete", actor, nowIso))
-        .run();
+      if (WRITE_UPSERT_ROW_VERSIONS) {
+        await db.prepare(INSERT_ROW_VERSION_SQL)
+          .bind(...mapCurrentRowToVersionBind(existing, "delete", actor, nowIso))
+          .run();
+      }
 
       await db
         .prepare(
@@ -1609,56 +1790,64 @@ export async function saveDashboardState(db, input = {}) {
         .run();
     }
 
-    await db
-      .prepare(
-        `INSERT INTO dashboard_save_events (
-          state_key,
-          saved_at,
-          rows_total,
-          rows_changed,
-          rows_deleted,
-          logs_upserted,
-          payload_size,
-          actor_user_id,
-          actor_login,
-          actor_role,
-          actor_ip,
-          source,
-          action_key,
-          mode,
-          created_at
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
-      )
-      .bind(
-        stateKey,
-        savedAtIso,
-        normalizedRows.length,
-        rowsChanged,
-        rowsDeleted,
-        logsUpserted,
-        payloadBytes,
-        actor.userId,
-        actor.login,
-        actor.role,
-        actor.ip,
-        safeString(payload.source, 40) || "manual",
-        safeString(payload.actionKey, 80) || "all",
-        safeString(payload.mode, 40) || "full",
-        nowIso,
-      )
-      .run();
+    if (WRITE_SAVE_EVENTS) {
+      await db
+        .prepare(
+          `INSERT INTO dashboard_save_events (
+            state_key,
+            saved_at,
+            rows_total,
+            rows_changed,
+            rows_deleted,
+            logs_upserted,
+            payload_size,
+            actor_user_id,
+            actor_login,
+            actor_role,
+            actor_ip,
+            source,
+            action_key,
+            mode,
+            created_at
+          ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
+        )
+        .bind(
+          stateKey,
+          savedAtIso,
+          normalizedRows.length,
+          rowsChanged,
+          rowsDeleted,
+          logsUpserted,
+          payloadBytes,
+          actor.userId,
+          actor.login,
+          actor.role,
+          actor.ip,
+          safeString(payload.source, 40) || "manual",
+          safeString(payload.actionKey, 80) || "all",
+          safeString(payload.mode, 40) || "full",
+          nowIso,
+        )
+        .run();
+    }
 
-    const rowsToPruneLogs = new Set([...changedRowIds, ...rowsWithUpdatedLogs]);
+    await maybeCompactStateStorage(db, stateKey, savedAtIso, nowIso);
 
-    for (const rowId of changedRowIds) {
-      await pruneRowVersions(db, stateKey, rowId);
+    const rowsToPruneLogs = new Set([...rowsWithUpdatedLogs]);
+
+    if (WRITE_UPSERT_ROW_VERSIONS) {
+      for (const rowId of changedRowIds) {
+        await pruneRowVersions(db, stateKey, rowId);
+      }
     }
     for (const rowId of rowsToPruneLogs) {
       await pruneRowLogs(db, stateKey, rowId);
     }
 
     await pruneSnapshots(db, stateKey);
-    await pruneSaveEvents(db, stateKey);
+    if (WRITE_SAVE_EVENTS) {
+      await pruneSaveEvents(db, stateKey);
+    }
 
     if (txStarted) {
       await db.exec("COMMIT");
@@ -1732,10 +1921,35 @@ export async function saveDashboardStatePatch(db, input = {}) {
     }
   })();
 
-  const existingRowsById = await getCurrentRowsMap(db, stateKey);
-  const existingLatestLogIds = await getLatestRowLogIds(db, stateKey);
+  const upsertCandidateRowIds = [];
+  const candidateRowIdsSet = new Set();
+  for (const rowRaw of rowsUpsertRaw) {
+    const rowCandidate = rowRaw && typeof rowRaw === "object" ? rowRaw : null;
+    if (!rowCandidate) {
+      continue;
+    }
+    const candidateNmId = normalizeNmId(rowCandidate.nmId);
+    const candidateRowId = safeString(rowCandidate.id, 120);
+    const rowId = candidateNmId || candidateRowId;
+    if (!rowId) {
+      continue;
+    }
+    if (!candidateRowIdsSet.has(rowId)) {
+      candidateRowIdsSet.add(rowId);
+    }
+    upsertCandidateRowIds.push(rowId);
+  }
+  for (const rowId of rowIdsDelete) {
+    if (!candidateRowIdsSet.has(rowId)) {
+      candidateRowIdsSet.add(rowId);
+    }
+  }
+
+  const existingRowsTotal = await getCurrentRowsCount(db, stateKey);
+  const existingRowsById = await getCurrentRowsMapByIds(db, stateKey, Array.from(candidateRowIdsSet));
+  const existingLatestLogIds = await getLatestRowLogIdsForRows(db, stateKey, upsertCandidateRowIds);
   const existingSnapshotCount = await getSnapshotCount(db, stateKey);
-  const existingRowsTotal = existingRowsById.size;
+  let maxSortIndex = await getMaxSortIndex(db, stateKey);
 
   const rowIdsToDeleteExisting = rowIdsDelete.filter((rowId) => existingRowsById.has(rowId));
   if (!allowRowDelete && rowIdsToDeleteExisting.length > 0) {
@@ -1755,24 +1969,6 @@ export async function saveDashboardStatePatch(db, input = {}) {
     );
     error.status = 409;
     throw error;
-  }
-
-  const nextSortIndexByRowId = new Map();
-  const takenSortIndexes = new Set();
-  let maxSortIndex = 0;
-  for (const existing of existingRowsById.values()) {
-    const rowId = safeString(existing.row_id, 120);
-    if (!rowId) {
-      continue;
-    }
-    const sortIndex = Number.isFinite(Number(existing.sort_index))
-      ? Math.max(0, Math.round(Number(existing.sort_index)))
-      : 0;
-    nextSortIndexByRowId.set(rowId, sortIndex);
-    takenSortIndexes.add(sortIndex);
-    if (sortIndex > maxSortIndex) {
-      maxSortIndex = sortIndex;
-    }
   }
 
   const rowsUpsertNormalized = [];
@@ -1798,19 +1994,14 @@ export async function saveDashboardStatePatch(db, input = {}) {
 
     let sortIndex = Number.isFinite(Number(rowCandidate.sortIndex))
       ? Math.max(0, Math.round(Number(rowCandidate.sortIndex)))
-      : Number.isFinite(Number(nextSortIndexByRowId.get(rowId)))
-        ? Math.max(0, Math.round(Number(nextSortIndexByRowId.get(rowId))))
+      : existing && Number.isFinite(Number(existing.sort_index))
+        ? Math.max(0, Math.round(Number(existing.sort_index)))
         : NaN;
 
     if (!Number.isFinite(sortIndex)) {
       maxSortIndex += 1;
-      while (takenSortIndexes.has(maxSortIndex)) {
-        maxSortIndex += 1;
-      }
       sortIndex = maxSortIndex;
     }
-    takenSortIndexes.add(sortIndex);
-    nextSortIndexByRowId.set(rowId, sortIndex);
 
     const normalized = await normalizeRowForStorage(
       {
@@ -1829,6 +2020,7 @@ export async function saveDashboardStatePatch(db, input = {}) {
   let rowsChanged = 0;
   let rowsDeleted = 0;
   let logsUpserted = 0;
+  let rowsTotalCurrent = existingRowsTotal;
 
   let txStarted = false;
   try {
@@ -1862,7 +2054,7 @@ export async function saveDashboardStatePatch(db, input = {}) {
           .bind(...mapNormalizedRowToCurrentBind(row, existing?.created_at || null))
           .run();
 
-        if (row.nmId) {
+        if (row.nmId && (!existing || TOUCH_ARTICLE_REGISTRY_ON_UPDATE)) {
           await db.prepare(UPSERT_ARTICLE_REGISTRY_SQL)
             .bind(
               stateKey,
@@ -1877,11 +2069,16 @@ export async function saveDashboardStatePatch(db, input = {}) {
             .run();
         }
 
+        if (!existing) {
+          rowsTotalCurrent += 1;
+        }
         rowsChanged += 1;
         changedRowIds.add(row.rowId);
-        await db.prepare(INSERT_ROW_VERSION_SQL)
-          .bind(...mapNormalizedRowToVersionBind(row, "upsert", actor, nowIso))
-          .run();
+        if (WRITE_UPSERT_ROW_VERSIONS) {
+          await db.prepare(INSERT_ROW_VERSION_SQL)
+            .bind(...mapNormalizedRowToVersionBind(row, "upsert", actor, nowIso))
+            .run();
+        }
 
         existingRowsById.set(row.rowId, {
           ...(existing || {}),
@@ -1918,10 +2115,13 @@ export async function saveDashboardStatePatch(db, input = {}) {
 
       rowsDeleted += 1;
       changedRowIds.add(rowId);
+      rowsTotalCurrent = Math.max(0, rowsTotalCurrent - 1);
 
-      await db.prepare(INSERT_ROW_VERSION_SQL)
-        .bind(...mapCurrentRowToVersionBind(existing, "delete", actor, nowIso))
-        .run();
+      if (WRITE_UPSERT_ROW_VERSIONS) {
+        await db.prepare(INSERT_ROW_VERSION_SQL)
+          .bind(...mapCurrentRowToVersionBind(existing, "delete", actor, nowIso))
+          .run();
+      }
 
       await db
         .prepare(
@@ -1943,66 +2143,76 @@ export async function saveDashboardStatePatch(db, input = {}) {
         .run();
     }
 
-    await db
-      .prepare(
-        `INSERT INTO dashboard_save_events (
-          state_key,
-          saved_at,
-          rows_total,
-          rows_changed,
-          rows_deleted,
-          logs_upserted,
-          payload_size,
-          actor_user_id,
-          actor_login,
-          actor_role,
-          actor_ip,
-          source,
-          action_key,
-          mode,
-          created_at
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
-      )
-      .bind(
-        stateKey,
-        savedAtIso,
-        existingRowsById.size,
-        rowsChanged,
-        rowsDeleted,
-        logsUpserted,
-        payloadBytes,
-        actor.userId,
-        actor.login,
-        actor.role,
-        actor.ip,
-        safeString(patch.source, 40) || "manual",
-        safeString(patch.actionKey, 80) || "delta",
-        safeString(patch.mode, 40) || "partial",
-        nowIso,
-      )
-      .run();
+    if (WRITE_SAVE_EVENTS) {
+      await db
+        .prepare(
+          `INSERT INTO dashboard_save_events (
+            state_key,
+            saved_at,
+            rows_total,
+            rows_changed,
+            rows_deleted,
+            logs_upserted,
+            payload_size,
+            actor_user_id,
+            actor_login,
+            actor_role,
+            actor_ip,
+            source,
+            action_key,
+            mode,
+            created_at
+          ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
+        )
+        .bind(
+          stateKey,
+          savedAtIso,
+          rowsTotalCurrent,
+          rowsChanged,
+          rowsDeleted,
+          logsUpserted,
+          payloadBytes,
+          actor.userId,
+          actor.login,
+          actor.role,
+          actor.ip,
+          safeString(patch.source, 40) || "manual",
+          safeString(patch.actionKey, 80) || "delta",
+          safeString(patch.mode, 40) || "partial",
+          nowIso,
+        )
+        .run();
+    }
 
-    const compactPayload = {
-      savedAt: savedAtIso,
-      lastSyncAt: safeString(patch.lastSyncAt, 100) || savedAtIso,
-      rowsCount: existingRowsById.size,
-      migrated: true,
-      updatedAt: nowIso,
-    };
-    await db.prepare(UPSERT_LEGACY_STATE_SQL)
-      .bind(stateKey, JSON.stringify(compactPayload), savedAtIso, nowIso)
-      .run();
+    await maybeCompactStateStorage(db, stateKey, savedAtIso, nowIso);
 
-    const rowsToPruneLogs = new Set([...changedRowIds, ...rowsWithUpdatedLogs]);
-    for (const rowId of changedRowIds) {
-      await pruneRowVersions(db, stateKey, rowId);
+    if (WRITE_LEGACY_STATE_ON_SAVE) {
+      const compactPayload = {
+        savedAt: savedAtIso,
+        lastSyncAt: safeString(patch.lastSyncAt, 100) || savedAtIso,
+        rowsCount: rowsTotalCurrent,
+        migrated: true,
+        updatedAt: nowIso,
+      };
+      await db.prepare(UPSERT_LEGACY_STATE_SQL)
+        .bind(stateKey, JSON.stringify(compactPayload), savedAtIso, nowIso)
+        .run();
+    }
+
+    const rowsToPruneLogs = new Set([...rowsWithUpdatedLogs]);
+    if (WRITE_UPSERT_ROW_VERSIONS) {
+      for (const rowId of changedRowIds) {
+        await pruneRowVersions(db, stateKey, rowId);
+      }
     }
     for (const rowId of rowsToPruneLogs) {
       await pruneRowLogs(db, stateKey, rowId);
     }
 
     await pruneSnapshots(db, stateKey);
-    await pruneSaveEvents(db, stateKey);
+    if (WRITE_SAVE_EVENTS) {
+      await pruneSaveEvents(db, stateKey);
+    }
 
     if (txStarted) {
       await db.exec("COMMIT");
@@ -2022,7 +2232,7 @@ export async function saveDashboardStatePatch(db, input = {}) {
     key: stateKey,
     savedAt: savedAtIso,
     updatedAt: nowIso,
-    rowsTotal: existingRowsById.size,
+    rowsTotal: rowsTotalCurrent,
     rowsChanged,
     rowsDeleted,
     logsUpserted,

@@ -1139,7 +1139,11 @@ async function handleLoadProblematic() {
   }
 
   if (el.loadProblemBtn) {
-    el.loadProblemBtn.textContent = "Обновляю проблемные...";
+    if (typeof setStaticButtonIcon === "function") {
+      setStaticButtonIcon(el.loadProblemBtn, "loader", "Обновляю проблемные...");
+    } else {
+      el.loadProblemBtn.textContent = "Обновляю проблемные...";
+    }
   }
 
   const total = problemRowIds.length;
@@ -1162,7 +1166,12 @@ async function handleLoadProblematic() {
       }
       const rowId = problemRowIds[index];
       if (el.loadProblemBtn) {
-        el.loadProblemBtn.textContent = `Проблемные: ${index + 1}/${total}`;
+        const progressLabel = `Проблемные: ${index + 1}/${total}`;
+        if (typeof setStaticButtonIcon === "function") {
+          setStaticButtonIcon(el.loadProblemBtn, "loader", progressLabel);
+        } else {
+          el.loadProblemBtn.textContent = progressLabel;
+        }
       }
       await loadRow(rowId, {
         forceHostProbe: true,

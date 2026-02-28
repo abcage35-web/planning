@@ -7,10 +7,18 @@ function handleToggleControls() {
 function applyControlsState() {
   if (state.controlsCollapsed) {
     el.controlsPanel.classList.add("controls-collapsed");
-    el.toggleControlsBtn.textContent = "Показать блок заполнения";
+    if (typeof setStaticButtonIcon === "function") {
+      setStaticButtonIcon(el.toggleControlsBtn, "chevronDown", "Показать блок заполнения");
+    } else {
+      el.toggleControlsBtn.textContent = "Показать блок заполнения";
+    }
   } else {
     el.controlsPanel.classList.remove("controls-collapsed");
-    el.toggleControlsBtn.textContent = "Скрыть блок заполнения";
+    if (typeof setStaticButtonIcon === "function") {
+      setStaticButtonIcon(el.toggleControlsBtn, "chevronUp", "Скрыть блок заполнения");
+    } else {
+      el.toggleControlsBtn.textContent = "Скрыть блок заполнения";
+    }
   }
 }
 

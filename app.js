@@ -428,6 +428,9 @@ function hydrateStaticIcons() {
   setStaticButtonIcon(el.previewPrevBtn, "chevronLeft");
   setStaticButtonIcon(el.previewNextBtn, "chevronRight");
   setStaticButtonIcon(el.logoutBtn, "logOut");
+  setStaticButtonIcon(el.loadAllBtn, "refresh", "Обновить карточки");
+  setStaticButtonIcon(el.loadProblemBtn, "refresh", "Обновить проблемные");
+  setStaticButtonIcon(el.toggleControlsBtn, state.controlsCollapsed ? "chevronDown" : "chevronUp", state.controlsCollapsed ? "Показать блок заполнения" : "Скрыть блок заполнения");
   setStaticButtonIcon(el.downloadExportBtn, "download", "Скачать таблицу");
   syncAuthPasswordToggleIcon();
 }

@@ -108,7 +108,7 @@ function renderRows() {
             }>
               ${
                 updatedAtCompact
-                  ? `<span class="actions-updated-date">${escapeHtml(updatedAtCompact.date)}</span><span class="actions-updated-time">${escapeHtml(updatedAtCompact.time)}</span>`
+                  ? `<span class="actions-updated-date">${escapeHtml(updatedAtCompact.date)}</span>${updatedAtCompact.time ? `<span class="actions-updated-time">${escapeHtml(updatedAtCompact.time)}</span>` : ""}`
                   : '<span class="actions-updated-date">--.--.--</span><span class="actions-updated-time">--:--</span>'
               }
             </span>
@@ -190,7 +190,7 @@ function formatRowUpdatedAtCompact(valueRaw) {
     if (diffMinutes <= 30) {
       return {
         date: "недавно",
-        time: "до 30 минут",
+        time: "",
       };
     }
 
