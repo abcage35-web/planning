@@ -1058,7 +1058,11 @@ export async function ensureStateTables(db) {
     .filter(Boolean);
 
   for (const statement of statements) {
-    await db.exec(statement);
+    const singleLine = statement.replace(/\s+/g, " ").trim();
+    if (!singleLine) {
+      continue;
+    }
+    await db.exec(singleLine);
   }
 
   tablesEnsured = true;
