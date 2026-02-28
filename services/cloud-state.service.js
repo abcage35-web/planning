@@ -1,7 +1,7 @@
 const CLOUD_STATE_DEFAULT_KEY = "wb-dashboard-v2";
 const CLOUD_STATE_DEFAULT_ENDPOINT = "/api/state";
 const CLOUD_STATE_EXPORT_ENDPOINT = "/api/state-export";
-const CLOUD_STATE_FETCH_TIMEOUT_MS = 9000;
+const CLOUD_STATE_FETCH_TIMEOUT_MS = 30000;
 const CLOUD_STATE_SYNC_DEBOUNCE_MS = 250;
 
 const cloudStateSync = {

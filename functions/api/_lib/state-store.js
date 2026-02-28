@@ -600,27 +600,33 @@ async function getSnapshotCount(db, stateKey) {
   return Math.max(0, Number(row?.total) || 0);
 }
 
-async function getRowLogCounts(db, stateKey) {
+async function getLatestRowLogIds(db, stateKey) {
   const result = await db
     .prepare(
-      `SELECT row_id, COUNT(1) AS total
+      `SELECT row_id, log_id
        FROM dashboard_row_logs
        WHERE state_key = ?1
-       GROUP BY row_id`,
+         AND rowid IN (
+           SELECT MAX(rowid)
+           FROM dashboard_row_logs
+           WHERE state_key = ?1
+           GROUP BY row_id
+         )`,
     )
     .bind(stateKey)
     .all();
 
   const rows = Array.isArray(result?.results) ? result.results : [];
-  const counts = new Map();
+  const latestByRowId = new Map();
   for (const row of rows) {
     const rowId = safeString(row.row_id, 120);
-    if (!rowId) {
+    const logId = safeString(row.log_id, 120);
+    if (!rowId || !logId) {
       continue;
     }
-    counts.set(rowId, Math.max(0, Number(row.total) || 0));
+    latestByRowId.set(rowId, logId);
   }
-  return counts;
+  return latestByRowId;
 }
 
 const CURRENT_ROW_COLUMNS = [
@@ -1440,11 +1446,12 @@ export async function saveDashboardState(db, input = {}) {
   })();
 
   const existingRowsById = await getCurrentRowsMap(db, stateKey);
-  const existingLogCounts = await getRowLogCounts(db, stateKey);
+  const existingLatestLogIds = await getLatestRowLogIds(db, stateKey);
   const existingSnapshotCount = await getSnapshotCount(db, stateKey);
   const incomingRowIds = new Set(normalizedRows.map((row) => row.rowId));
 
   const changedRowIds = new Set();
+  const rowsWithUpdatedLogs = new Set();
   let rowsChanged = 0;
   let rowsDeleted = 0;
   let logsUpserted = 0;
@@ -1488,26 +1495,26 @@ export async function saveDashboardState(db, input = {}) {
       const existingHash = existing ? String(existing.row_hash || "") : "";
       const isChanged = !existing || existingHash !== row.rowHash;
 
-      await db.prepare(UPSERT_ROW_SQL)
-        .bind(...mapNormalizedRowToCurrentBind(row, existing?.created_at || null))
-        .run();
-
-      if (row.nmId) {
-        await db.prepare(UPSERT_ARTICLE_REGISTRY_SQL)
-          .bind(
-            stateKey,
-            row.nmId,
-            nowIso,
-            nowIso,
-            actor.userId,
-            actor.login,
-            actor.role,
-            actor.ip,
-          )
-          .run();
-      }
-
       if (isChanged) {
+        await db.prepare(UPSERT_ROW_SQL)
+          .bind(...mapNormalizedRowToCurrentBind(row, existing?.created_at || null))
+          .run();
+
+        if (row.nmId) {
+          await db.prepare(UPSERT_ARTICLE_REGISTRY_SQL)
+            .bind(
+              stateKey,
+              row.nmId,
+              nowIso,
+              nowIso,
+              actor.userId,
+              actor.login,
+              actor.role,
+              actor.ip,
+            )
+            .run();
+        }
+
         rowsChanged += 1;
         changedRowIds.add(row.rowId);
         await db.prepare(INSERT_ROW_VERSION_SQL)
@@ -1515,15 +1522,22 @@ export async function saveDashboardState(db, input = {}) {
           .run();
       }
 
-      const existingLogsForRow = existingLogCounts.get(row.rowId) || 0;
+      const latestIncomingLog = row.logs.length > 0 ? row.logs[row.logs.length - 1] : null;
+      const latestIncomingLogId = latestIncomingLog ? safeString(latestIncomingLog.logId, 120) : "";
+      const latestStoredLogId = existingLatestLogIds.get(row.rowId) || "";
+
       const logsToPersist =
-        existingLogsForRow > 0 ? row.logs.slice(-8) : row.logs.slice(-ROW_LOG_LIMIT);
+        latestIncomingLog && latestIncomingLogId && latestIncomingLogId !== latestStoredLogId
+          ? [latestIncomingLog]
+          : [];
 
       for (const log of logsToPersist) {
         await db.prepare(UPSERT_ROW_LOG_SQL)
           .bind(...mapLogToBind(stateKey, row.rowId, log, actor, nowIso))
           .run();
         logsUpserted += 1;
+        rowsWithUpdatedLogs.add(row.rowId);
+        existingLatestLogIds.set(row.rowId, safeString(log.logId, 120));
       }
     }
 
@@ -1596,8 +1610,12 @@ export async function saveDashboardState(db, input = {}) {
       )
       .run();
 
+    const rowsToPruneLogs = new Set([...changedRowIds, ...rowsWithUpdatedLogs]);
+
     for (const rowId of changedRowIds) {
       await pruneRowVersions(db, stateKey, rowId);
+    }
+    for (const rowId of rowsToPruneLogs) {
       await pruneRowLogs(db, stateKey, rowId);
     }
 
