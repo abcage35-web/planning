@@ -1866,11 +1866,12 @@ function renderRowHistoryContent(row, logsRaw) {
       const actorLogin = String(entry.actorLogin || "").trim();
       const actorIp = String(entry.actorIp || "").trim();
       const actorRole = String(entry.actorRole || "").trim();
+      const canViewActorIp = typeof hasAdminAccess === "function" ? hasAdminAccess() : false;
       const actorParts = [];
       if (actorLogin) {
         actorParts.push(actorRole ? `${actorLogin} (${actorRole})` : actorLogin);
       }
-      if (actorIp) {
+      if (canViewActorIp && actorIp) {
         actorParts.push(`IP: ${actorIp}`);
       }
       const actorMeta = actorParts.length > 0 ? ` · ${actorParts.join(" · ")}` : "";

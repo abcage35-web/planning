@@ -611,6 +611,21 @@ function normalizeSnapshots(snapshotsRaw, savedAtIso) {
   return output;
 }
 
+function normalizeRowIdList(rowIdsRaw) {
+  const source = Array.isArray(rowIdsRaw) ? rowIdsRaw : [];
+  const unique = [];
+  const seen = new Set();
+  for (const raw of source) {
+    const rowId = safeString(raw, 120);
+    if (!rowId || seen.has(rowId)) {
+      continue;
+    }
+    seen.add(rowId);
+    unique.push(rowId);
+  }
+  return unique;
+}
+
 async function getSnapshotCount(db, stateKey) {
   const row = await db
     .prepare(
@@ -1664,6 +1679,350 @@ export async function saveDashboardState(db, input = {}) {
     savedAt: savedAtIso,
     updatedAt: nowIso,
     rowsTotal: normalizedRows.length,
+    rowsChanged,
+    rowsDeleted,
+    logsUpserted,
+    payloadBytes,
+  };
+}
+
+export async function saveDashboardStatePatch(db, input = {}) {
+  await ensureStateTables(db);
+
+  const stateKey = safeString(input.stateKey, 120) || DEFAULT_STATE_KEY;
+  const patch = input.patch && typeof input.patch === "object" ? input.patch : null;
+  if (!patch) {
+    const error = new Error("patch must be an object");
+    error.status = 400;
+    throw error;
+  }
+
+  const actor = {
+    stateKey,
+    userId: Number.isFinite(Number(input.actorUserId)) ? Number(input.actorUserId) : null,
+    login: safeString(input.actorLogin, 80),
+    role: safeString(input.actorRole, 40),
+    ip: safeString(input.actorIp, 64),
+  };
+
+  const allowRowInsert = input.allowRowInsert !== false;
+  const allowRowDelete = input.allowRowDelete !== false;
+  const confirmMassDelete = input.confirmMassDelete === true;
+
+  const nowIso = new Date().toISOString();
+  const savedAtIso = toIsoOrNow(patch.savedAt || patch.lastSyncAt, nowIso);
+  const rowsUpsertRaw = Array.isArray(patch.rowsUpsert) ? patch.rowsUpsert : [];
+  const rowIdsDelete = normalizeRowIdList(patch.rowIdsDelete);
+  const snapshots = normalizeSnapshots(patch.updateSnapshots, savedAtIso);
+  const metaSource =
+    patch.meta && typeof patch.meta === "object" && !Array.isArray(patch.meta) ? patch.meta : patch;
+  const metaPayload = normalizeMetaPayload({
+    ...metaSource,
+    savedAt: patch.savedAt || metaSource.savedAt || savedAtIso,
+    lastSyncAt: patch.lastSyncAt || metaSource.lastSyncAt || savedAtIso,
+  });
+  const metaJson = toJson(metaPayload, "{}");
+
+  const payloadBytes = (() => {
+    try {
+      const encoded = new TextEncoder().encode(JSON.stringify(patch));
+      return encoded.byteLength;
+    } catch {
+      return 0;
+    }
+  })();
+
+  const existingRowsById = await getCurrentRowsMap(db, stateKey);
+  const existingLatestLogIds = await getLatestRowLogIds(db, stateKey);
+  const existingSnapshotCount = await getSnapshotCount(db, stateKey);
+  const existingRowsTotal = existingRowsById.size;
+
+  const rowIdsToDeleteExisting = rowIdsDelete.filter((rowId) => existingRowsById.has(rowId));
+  if (!allowRowDelete && rowIdsToDeleteExisting.length > 0) {
+    const error = new Error("Only admin can add or remove products.");
+    error.status = 403;
+    throw error;
+  }
+
+  if (
+    rowIdsToDeleteExisting.length > 0 &&
+    existingRowsTotal >= 50 &&
+    rowIdsToDeleteExisting.length >= Math.max(1, Math.ceil(existingRowsTotal * 0.5)) &&
+    !confirmMassDelete
+  ) {
+    const error = new Error(
+      "Mass delete protection: rows reduction exceeds 50%. Confirm explicitly with confirmMassDelete=true.",
+    );
+    error.status = 409;
+    throw error;
+  }
+
+  const nextSortIndexByRowId = new Map();
+  const takenSortIndexes = new Set();
+  let maxSortIndex = 0;
+  for (const existing of existingRowsById.values()) {
+    const rowId = safeString(existing.row_id, 120);
+    if (!rowId) {
+      continue;
+    }
+    const sortIndex = Number.isFinite(Number(existing.sort_index))
+      ? Math.max(0, Math.round(Number(existing.sort_index)))
+      : 0;
+    nextSortIndexByRowId.set(rowId, sortIndex);
+    takenSortIndexes.add(sortIndex);
+    if (sortIndex > maxSortIndex) {
+      maxSortIndex = sortIndex;
+    }
+  }
+
+  const rowsUpsertNormalized = [];
+  for (const rowRaw of rowsUpsertRaw) {
+    const rowCandidate = rowRaw && typeof rowRaw === "object" ? rowRaw : null;
+    if (!rowCandidate) {
+      continue;
+    }
+
+    const candidateNmId = normalizeNmId(rowCandidate.nmId);
+    const candidateRowId = safeString(rowCandidate.id, 120);
+    const rowId = candidateNmId || candidateRowId;
+    if (!rowId) {
+      continue;
+    }
+
+    const existing = existingRowsById.get(rowId) || null;
+    if (!allowRowInsert && !existing) {
+      const error = new Error("Only admin can add or remove products.");
+      error.status = 403;
+      throw error;
+    }
+
+    let sortIndex = Number.isFinite(Number(rowCandidate.sortIndex))
+      ? Math.max(0, Math.round(Number(rowCandidate.sortIndex)))
+      : Number.isFinite(Number(nextSortIndexByRowId.get(rowId)))
+        ? Math.max(0, Math.round(Number(nextSortIndexByRowId.get(rowId))))
+        : NaN;
+
+    if (!Number.isFinite(sortIndex)) {
+      maxSortIndex += 1;
+      while (takenSortIndexes.has(maxSortIndex)) {
+        maxSortIndex += 1;
+      }
+      sortIndex = maxSortIndex;
+    }
+    takenSortIndexes.add(sortIndex);
+    nextSortIndexByRowId.set(rowId, sortIndex);
+
+    const normalized = await normalizeRowForStorage(
+      {
+        ...rowCandidate,
+        id: rowId,
+      },
+      sortIndex,
+      actor,
+      savedAtIso,
+    );
+    rowsUpsertNormalized.push(normalized);
+  }
+
+  const changedRowIds = new Set();
+  const rowsWithUpdatedLogs = new Set();
+  let rowsChanged = 0;
+  let rowsDeleted = 0;
+  let logsUpserted = 0;
+
+  let txStarted = false;
+  try {
+    await db.exec("BEGIN");
+    txStarted = true;
+  } catch {
+    txStarted = false;
+  }
+
+  try {
+    await db.prepare(UPSERT_META_SQL)
+      .bind(
+        stateKey,
+        metaJson,
+        savedAtIso,
+        nowIso,
+        actor.userId,
+        actor.login,
+        actor.role,
+        actor.ip,
+      )
+      .run();
+
+    for (const row of rowsUpsertNormalized) {
+      const existing = existingRowsById.get(row.rowId) || null;
+      const existingHash = existing ? String(existing.row_hash || "") : "";
+      const isChanged = !existing || existingHash !== row.rowHash;
+
+      if (isChanged) {
+        await db.prepare(UPSERT_ROW_SQL)
+          .bind(...mapNormalizedRowToCurrentBind(row, existing?.created_at || null))
+          .run();
+
+        if (row.nmId) {
+          await db.prepare(UPSERT_ARTICLE_REGISTRY_SQL)
+            .bind(
+              stateKey,
+              row.nmId,
+              nowIso,
+              nowIso,
+              actor.userId,
+              actor.login,
+              actor.role,
+              actor.ip,
+            )
+            .run();
+        }
+
+        rowsChanged += 1;
+        changedRowIds.add(row.rowId);
+        await db.prepare(INSERT_ROW_VERSION_SQL)
+          .bind(...mapNormalizedRowToVersionBind(row, "upsert", actor, nowIso))
+          .run();
+
+        existingRowsById.set(row.rowId, {
+          ...(existing || {}),
+          row_id: row.rowId,
+          row_hash: row.rowHash,
+          created_at: existing?.created_at || row.createdAt,
+          sort_index: row.sortIndex,
+        });
+      }
+
+      const latestIncomingLog = row.logs.length > 0 ? row.logs[row.logs.length - 1] : null;
+      const latestIncomingLogId = latestIncomingLog ? safeString(latestIncomingLog.logId, 120) : "";
+      const latestStoredLogId = existingLatestLogIds.get(row.rowId) || "";
+      const logsToPersist =
+        latestIncomingLog && latestIncomingLogId && latestIncomingLogId !== latestStoredLogId
+          ? [latestIncomingLog]
+          : [];
+
+      for (const log of logsToPersist) {
+        await db.prepare(UPSERT_ROW_LOG_SQL)
+          .bind(...mapLogToBind(stateKey, row.rowId, log, actor, nowIso))
+          .run();
+        logsUpserted += 1;
+        rowsWithUpdatedLogs.add(row.rowId);
+        existingLatestLogIds.set(row.rowId, safeString(log.logId, 120));
+      }
+    }
+
+    for (const rowId of rowIdsToDeleteExisting) {
+      const existing = existingRowsById.get(rowId) || null;
+      if (!existing) {
+        continue;
+      }
+
+      rowsDeleted += 1;
+      changedRowIds.add(rowId);
+
+      await db.prepare(INSERT_ROW_VERSION_SQL)
+        .bind(...mapCurrentRowToVersionBind(existing, "delete", actor, nowIso))
+        .run();
+
+      await db
+        .prepare(
+          `DELETE FROM dashboard_rows_current
+           WHERE state_key = ?1 AND row_id = ?2`,
+        )
+        .bind(stateKey, rowId)
+        .run();
+
+      existingRowsById.delete(rowId);
+    }
+
+    const snapshotsToPersist =
+      existingSnapshotCount <= 0 ? snapshots : snapshots.length > 0 ? snapshots.slice(-1) : [];
+
+    for (const snapshot of snapshotsToPersist) {
+      await db.prepare(UPSERT_PROBLEM_SNAPSHOT_SQL)
+        .bind(...mapSnapshotToBind(stateKey, snapshot, nowIso))
+        .run();
+    }
+
+    await db
+      .prepare(
+        `INSERT INTO dashboard_save_events (
+          state_key,
+          saved_at,
+          rows_total,
+          rows_changed,
+          rows_deleted,
+          logs_upserted,
+          payload_size,
+          actor_user_id,
+          actor_login,
+          actor_role,
+          actor_ip,
+          source,
+          action_key,
+          mode,
+          created_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
+      )
+      .bind(
+        stateKey,
+        savedAtIso,
+        existingRowsById.size,
+        rowsChanged,
+        rowsDeleted,
+        logsUpserted,
+        payloadBytes,
+        actor.userId,
+        actor.login,
+        actor.role,
+        actor.ip,
+        safeString(patch.source, 40) || "manual",
+        safeString(patch.actionKey, 80) || "delta",
+        safeString(patch.mode, 40) || "partial",
+        nowIso,
+      )
+      .run();
+
+    const compactPayload = {
+      savedAt: savedAtIso,
+      lastSyncAt: safeString(patch.lastSyncAt, 100) || savedAtIso,
+      rowsCount: existingRowsById.size,
+      migrated: true,
+      updatedAt: nowIso,
+    };
+    await db.prepare(UPSERT_LEGACY_STATE_SQL)
+      .bind(stateKey, JSON.stringify(compactPayload), savedAtIso, nowIso)
+      .run();
+
+    const rowsToPruneLogs = new Set([...changedRowIds, ...rowsWithUpdatedLogs]);
+    for (const rowId of changedRowIds) {
+      await pruneRowVersions(db, stateKey, rowId);
+    }
+    for (const rowId of rowsToPruneLogs) {
+      await pruneRowLogs(db, stateKey, rowId);
+    }
+
+    await pruneSnapshots(db, stateKey);
+    await pruneSaveEvents(db, stateKey);
+
+    if (txStarted) {
+      await db.exec("COMMIT");
+    }
+  } catch (error) {
+    if (txStarted) {
+      try {
+        await db.exec("ROLLBACK");
+      } catch {
+        // noop
+      }
+    }
+    throw error;
+  }
+
+  return {
+    key: stateKey,
+    savedAt: savedAtIso,
+    updatedAt: nowIso,
+    rowsTotal: existingRowsById.size,
     rowsChanged,
     rowsDeleted,
     logsUpserted,

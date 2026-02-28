@@ -9,6 +9,7 @@ import {
   loadDashboardState,
   migrateLegacyStateToNormalizedIfNeeded,
   saveDashboardState,
+  saveDashboardStatePatch,
 } from "./_lib/state-store.js";
 
 function getStateKeyFromBody(bodyRaw) {
@@ -35,6 +36,18 @@ function getRowsCount(payloadRaw) {
     return 0;
   }
   return Array.isArray(payload.rows) ? payload.rows.length : 0;
+}
+
+function getPatchFromBody(bodyRaw) {
+  const body = bodyRaw && typeof bodyRaw === "object" ? bodyRaw : null;
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+  const patch = body.patch;
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+    return null;
+  }
+  return patch;
 }
 
 export async function onRequestOptions() {
@@ -166,5 +179,81 @@ export async function onRequestPut(context) {
     });
   } catch (error) {
     return errorJson(error, "Не удалось сохранить состояние");
+  }
+}
+
+export async function onRequestPatch(context) {
+  const { env, request } = context;
+  if (!env?.DB) {
+    return json({ ok: false, error: "D1 binding DB is not configured" }, { status: 500 });
+  }
+
+  const session = await getSessionFromRequest(request, env);
+  if (!session) {
+    return json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const key = getStateKeyFromBody(body);
+  const patch = getPatchFromBody(body);
+  if (!patch) {
+    return json({ ok: false, error: "patch must be an object" }, { status: 400 });
+  }
+
+  try {
+    await ensureStateTables(env.DB);
+
+    const role = String(session?.user?.role || "").trim().toLowerCase();
+    const isAdmin = role === "admin";
+    const currentRowsCount = await getStateRowsCount(env.DB, key);
+    const requestedDeletes = Array.isArray(patch.rowIdsDelete) ? patch.rowIdsDelete.length : 0;
+    const hasDeletes = requestedDeletes > 0;
+    if (!isAdmin && hasDeletes) {
+      return json(
+        { ok: false, error: "Only admin can add or remove products." },
+        { status: 403 },
+      );
+    }
+
+    if (!isAdmin && currentRowsCount <= 0 && hasDeletes) {
+      return json(
+        { ok: false, error: "Only admin can add or remove products." },
+        { status: 403 },
+      );
+    }
+
+    const saved = await saveDashboardStatePatch(env.DB, {
+      stateKey: key,
+      patch,
+      actorUserId: session?.user?.id,
+      actorLogin: session?.user?.login,
+      actorRole: session?.user?.role,
+      actorIp: getClientIp(request),
+      allowRowInsert: isAdmin,
+      allowRowDelete: isAdmin,
+      confirmMassDelete: body?.confirmMassDelete === true,
+    });
+
+    return json({
+      ok: true,
+      key: saved.key,
+      savedAt: saved.savedAt,
+      updatedAt: saved.updatedAt,
+      stats: {
+        rowsTotal: saved.rowsTotal,
+        rowsChanged: saved.rowsChanged,
+        rowsDeleted: saved.rowsDeleted,
+        logsUpserted: saved.logsUpserted,
+        payloadBytes: saved.payloadBytes,
+      },
+    });
+  } catch (error) {
+    return errorJson(error, "Не удалось сохранить дельта-состояние");
   }
 }

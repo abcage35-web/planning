@@ -19,6 +19,12 @@ const cloudStateSync = {
   lastSyncFinishedAt: 0,
   lastSyncDurationMs: 0,
   lastSyncOk: false,
+  deltaBaseline: {
+    initialized: false,
+    rowSignatures: new Map(),
+    metaSignature: "",
+    snapshotSignature: "",
+  },
 };
 
 function getCloudStateSyncStatus() {
@@ -97,6 +103,159 @@ function parseCloudStateResponse(data) {
   return payload;
 }
 
+function getCloudRowKey(rowRaw, index) {
+  const row = rowRaw && typeof rowRaw === "object" ? rowRaw : {};
+  const nmId = String(row.nmId || "").trim();
+  if (nmId) {
+    return nmId;
+  }
+  const rowId = String(row.id || "").trim();
+  if (rowId) {
+    return rowId;
+  }
+  return `row-index:${Math.max(0, Math.round(Number(index) || 0))}`;
+}
+
+function getCloudRowSignature(rowRaw, index) {
+  const row = rowRaw && typeof rowRaw === "object" ? rowRaw : {};
+  try {
+    return JSON.stringify({
+      sortIndex: Math.max(0, Math.round(Number(index) || 0)),
+      row,
+    });
+  } catch {
+    return `${getCloudRowKey(rowRaw, index)}-${Date.now()}`;
+  }
+}
+
+function getCloudMetaFromPayload(payloadRaw) {
+  const payload = payloadRaw && typeof payloadRaw === "object" ? payloadRaw : {};
+  const meta = { ...payload };
+  delete meta.rows;
+  delete meta.updateSnapshots;
+  return meta;
+}
+
+function getCloudMetaSignature(metaRaw) {
+  const meta = metaRaw && typeof metaRaw === "object" ? { ...metaRaw } : {};
+  delete meta.savedAt;
+  delete meta.lastSyncAt;
+  try {
+    return JSON.stringify(meta);
+  } catch {
+    return "";
+  }
+}
+
+function getLatestCloudSnapshot(payloadRaw) {
+  const payload = payloadRaw && typeof payloadRaw === "object" ? payloadRaw : {};
+  const snapshots = Array.isArray(payload.updateSnapshots) ? payload.updateSnapshots : [];
+  return snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
+}
+
+function getCloudSnapshotSignature(snapshotRaw) {
+  if (!snapshotRaw || typeof snapshotRaw !== "object") {
+    return "";
+  }
+  try {
+    return JSON.stringify(snapshotRaw);
+  } catch {
+    return "";
+  }
+}
+
+function buildCloudDeltaBaseline(payloadRaw) {
+  const payload = payloadRaw && typeof payloadRaw === "object" ? payloadRaw : {};
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  const rowSignatures = new Map();
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    const key = getCloudRowKey(row, index);
+    const signature = getCloudRowSignature(row, index);
+    rowSignatures.set(key, signature);
+  }
+
+  const meta = getCloudMetaFromPayload(payload);
+  const latestSnapshot = getLatestCloudSnapshot(payload);
+  return {
+    initialized: true,
+    rowSignatures,
+    metaSignature: getCloudMetaSignature(meta),
+    snapshotSignature: getCloudSnapshotSignature(latestSnapshot),
+  };
+}
+
+function setCloudDeltaBaseline(payloadRaw) {
+  cloudStateSync.deltaBaseline = buildCloudDeltaBaseline(payloadRaw);
+}
+
+function buildCloudStateDeltaPatch(payloadRaw) {
+  const payload = payloadRaw && typeof payloadRaw === "object" ? payloadRaw : null;
+  if (!payload) {
+    return { noop: true, patch: null, nextBaseline: cloudStateSync.deltaBaseline };
+  }
+
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  const currentBaseline = cloudStateSync.deltaBaseline || {
+    initialized: false,
+    rowSignatures: new Map(),
+    metaSignature: "",
+    snapshotSignature: "",
+  };
+  const previousRowSignatures =
+    currentBaseline.rowSignatures instanceof Map ? currentBaseline.rowSignatures : new Map();
+  const nextBaseline = buildCloudDeltaBaseline(payload);
+
+  const rowsUpsert = [];
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    const rowKey = getCloudRowKey(row, index);
+    const nextSignature = nextBaseline.rowSignatures.get(rowKey) || "";
+    const prevSignature = previousRowSignatures.get(rowKey) || "";
+    if (!currentBaseline.initialized || nextSignature !== prevSignature) {
+      rowsUpsert.push({
+        ...(row && typeof row === "object" ? row : {}),
+        id: rowKey,
+        sortIndex: index,
+      });
+    }
+  }
+
+  const rowIdsDelete = [];
+  if (currentBaseline.initialized) {
+    for (const rowKey of previousRowSignatures.keys()) {
+      if (!nextBaseline.rowSignatures.has(rowKey)) {
+        rowIdsDelete.push(rowKey);
+      }
+    }
+  }
+
+  const meta = getCloudMetaFromPayload(payload);
+  const latestSnapshot = getLatestCloudSnapshot(payload);
+  const metaChanged = !currentBaseline.initialized || nextBaseline.metaSignature !== currentBaseline.metaSignature;
+  const snapshotChanged =
+    !currentBaseline.initialized || nextBaseline.snapshotSignature !== currentBaseline.snapshotSignature;
+
+  const patch = {
+    savedAt: String(payload.savedAt || payload.lastSyncAt || new Date().toISOString()),
+    lastSyncAt: String(payload.lastSyncAt || payload.savedAt || new Date().toISOString()),
+    source: String(payload.source || "manual"),
+    actionKey: String(payload.actionKey || "all"),
+    mode: String(payload.mode || "full"),
+    meta,
+    rowsUpsert,
+    rowIdsDelete,
+    updateSnapshots: snapshotChanged && latestSnapshot ? [latestSnapshot] : [],
+  };
+
+  const hasChanges = rowsUpsert.length > 0 || rowIdsDelete.length > 0 || snapshotChanged || metaChanged;
+  return {
+    noop: !hasChanges,
+    patch,
+    nextBaseline,
+  };
+}
+
 async function runCloudStateRequest(method, body = null) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), CLOUD_STATE_FETCH_TIMEOUT_MS);
@@ -121,17 +280,33 @@ async function runCloudStateRequest(method, body = null) {
           // noop
         }
       }
-      return null;
+      return {
+        ok: false,
+        status: 401,
+        data: null,
+      };
     }
 
     if (!response.ok) {
-      return null;
+      return {
+        ok: false,
+        status: response.status,
+        data: null,
+      };
     }
 
     const data = await response.json().catch(() => null);
-    return data;
+    return {
+      ok: true,
+      status: response.status,
+      data,
+    };
   } catch {
-    return null;
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+    };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -142,8 +317,15 @@ async function loadCloudStatePayload() {
     return null;
   }
 
-  const data = await runCloudStateRequest("GET");
-  return parseCloudStateResponse(data);
+  const response = await runCloudStateRequest("GET");
+  if (!response || response.ok !== true) {
+    return null;
+  }
+  const payload = parseCloudStateResponse(response.data);
+  if (payload) {
+    setCloudDeltaBaseline(payload);
+  }
+  return payload;
 }
 
 async function sendCloudStatePayload(payload) {
@@ -151,13 +333,33 @@ async function sendCloudStatePayload(payload) {
     return false;
   }
 
-  const body = {
-    key: getCloudStateKey(),
+  const key = getCloudStateKey();
+  const delta = buildCloudStateDeltaPatch(payload);
+  if (delta.noop) {
+    cloudStateSync.deltaBaseline = delta.nextBaseline;
+    return true;
+  }
+
+  const patchBody = {
+    key,
+    patch: delta.patch,
+  };
+  const patchResponse = await runCloudStateRequest("PATCH", patchBody);
+  if (patchResponse && patchResponse.ok === true && patchResponse.data && patchResponse.data.ok === true) {
+    cloudStateSync.deltaBaseline = delta.nextBaseline;
+    return true;
+  }
+
+  const fallbackBody = {
+    key,
     payload,
   };
-
-  const data = await runCloudStateRequest("PUT", body);
-  return Boolean(data && data.ok === true);
+  const putResponse = await runCloudStateRequest("PUT", fallbackBody);
+  if (putResponse && putResponse.ok === true && putResponse.data && putResponse.data.ok === true) {
+    setCloudDeltaBaseline(payload);
+    return true;
+  }
+  return false;
 }
 
 async function flushCloudStateSync() {
