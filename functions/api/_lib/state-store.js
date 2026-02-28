@@ -340,7 +340,8 @@ function normalizeProblemSnapshotEntry(raw, fallbackIso) {
 async function normalizeRowForStorage(rowRaw, sortIndex, actor, savedAtIso) {
   const row = rowRaw && typeof rowRaw === "object" ? rowRaw : {};
   const nmId = normalizeNmId(row.nmId);
-  const rowId = safeString(row.id, 120) || (nmId ? `row-${nmId}` : `row-${Date.now()}-${sortIndex}`);
+  const uiRowId = safeString(row.id, 120);
+  const rowId = nmId || uiRowId || `row-${Date.now()}-${sortIndex}`;
   const rowData = row.data && typeof row.data === "object" ? row.data : null;
 
   const recommendationRefs = normalizeArrayOfNmIds(
@@ -449,6 +450,75 @@ async function normalizeRowForStorage(rowRaw, sortIndex, actor, savedAtIso) {
     savedByRole: actor.role,
     savedByIp: actor.ip,
     logs,
+  };
+}
+
+async function hasNormalizedStateData(db, stateKey) {
+  const metaRow = await db
+    .prepare(
+      `SELECT state_key
+       FROM dashboard_state_meta
+       WHERE state_key = ?1
+       LIMIT 1`,
+    )
+    .bind(stateKey)
+    .first();
+  if (metaRow) {
+    return true;
+  }
+
+  const rowsCountRow = await db
+    .prepare(
+      `SELECT COUNT(1) AS total
+       FROM dashboard_rows_current
+       WHERE state_key = ?1`,
+    )
+    .bind(stateKey)
+    .first();
+  return (Number(rowsCountRow?.total) || 0) > 0;
+}
+
+export async function migrateLegacyStateToNormalizedIfNeeded(db, input = {}) {
+  await ensureStateTables(db);
+
+  const stateKey = safeString(input.stateKey, 120) || DEFAULT_STATE_KEY;
+  const alreadyNormalized = await hasNormalizedStateData(db, stateKey);
+  if (alreadyNormalized) {
+    return { migrated: false, reason: "already-normalized" };
+  }
+
+  const legacyRow = await db
+    .prepare(
+      `SELECT state_key, payload_json
+       FROM dashboard_state
+       WHERE state_key = ?1
+       LIMIT 1`,
+    )
+    .bind(stateKey)
+    .first();
+  if (!legacyRow) {
+    return { migrated: false, reason: "no-legacy-row" };
+  }
+
+  const legacyPayload = parsePayloadJson(legacyRow.payload_json || "");
+  if (!legacyPayload || !Array.isArray(legacyPayload.rows) || legacyPayload.rows.length <= 0) {
+    return { migrated: false, reason: "legacy-payload-empty" };
+  }
+
+  const saved = await saveDashboardState(db, {
+    stateKey,
+    payload: legacyPayload,
+    actorUserId: input.actorUserId,
+    actorLogin: input.actorLogin,
+    actorRole: input.actorRole,
+    actorIp: input.actorIp,
+  });
+
+  return {
+    migrated: true,
+    reason: "legacy-imported",
+    rowsTotal: saved.rowsTotal,
+    savedAt: saved.savedAt,
   };
 }
 

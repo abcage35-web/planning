@@ -5,6 +5,8 @@ import {
   ensureStateTables,
   errorJson,
   getDashboardExportRows,
+  getClientIp,
+  migrateLegacyStateToNormalizedIfNeeded,
 } from "./_lib/state-store.js";
 
 function getStateKey(request) {
@@ -40,6 +42,13 @@ export async function onRequestGet(context) {
   try {
     await ensureStateTables(env.DB);
     const key = getStateKey(request);
+    await migrateLegacyStateToNormalizedIfNeeded(env.DB, {
+      stateKey: key,
+      actorUserId: session?.user?.id,
+      actorLogin: session?.user?.login,
+      actorRole: session?.user?.role,
+      actorIp: getClientIp(request),
+    });
     const rows = await getDashboardExportRows(env.DB, key);
     const csv = buildDashboardExportCsv(rows);
 

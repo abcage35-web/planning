@@ -7,6 +7,7 @@ import {
   getStateKeyFromUrl,
   getStateRowsCount,
   loadDashboardState,
+  migrateLegacyStateToNormalizedIfNeeded,
   saveDashboardState,
 } from "./_lib/state-store.js";
 
@@ -55,6 +56,13 @@ export async function onRequestGet(context) {
     await ensureStateTables(env.DB);
     const url = new URL(request.url);
     const key = getStateKeyFromUrl(url);
+    await migrateLegacyStateToNormalizedIfNeeded(env.DB, {
+      stateKey: key,
+      actorUserId: session?.user?.id,
+      actorLogin: session?.user?.login,
+      actorRole: session?.user?.role,
+      actorIp: getClientIp(request),
+    });
     const state = await loadDashboardState(env.DB, key);
 
     return json({
