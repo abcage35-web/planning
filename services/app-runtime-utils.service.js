@@ -297,6 +297,56 @@ function formatBulkEta(totalSecondsRaw) {
   return `${hours}ч ${restMinutes}м`;
 }
 
+function getCloudSyncStatusForProgress() {
+  if (typeof getCloudStateSyncStatus !== "function") {
+    return null;
+  }
+  const status = getCloudStateSyncStatus();
+  return status && typeof status === "object" ? status : null;
+}
+
+function getCloudSyncEtaSeconds(statusRaw, nowMs = Date.now()) {
+  const status = statusRaw && typeof statusRaw === "object" ? statusRaw : null;
+  if (!status || status.disabled === true) {
+    return NaN;
+  }
+
+  const baseDurationMs = Math.max(1200, Math.round(Number(status.lastSyncDurationMs) || 3200));
+  let remainingMs = 0;
+
+  if (status.inFlight === true) {
+    const startedAt = Math.max(0, Math.round(Number(status.lastSyncStartedAt) || 0));
+    const elapsed = startedAt > 0 ? Math.max(0, nowMs - startedAt) : 0;
+    remainingMs += Math.max(400, baseDurationMs - elapsed);
+    if (status.pending === true) {
+      remainingMs += Math.max(900, Math.round(baseDurationMs * 0.8));
+    }
+  } else if (status.pending === true) {
+    remainingMs += Math.max(900, Math.round(baseDurationMs * 0.8));
+  }
+
+  const retryAt = Math.max(0, Math.round(Number(status.retryAt) || 0));
+  if (retryAt > nowMs) {
+    remainingMs += Math.max(0, retryAt - nowMs);
+    remainingMs += Math.max(900, Math.round(baseDurationMs * 0.6));
+  }
+
+  if (remainingMs <= 0) {
+    return 0;
+  }
+  return Math.max(1, Math.round(remainingMs / 1000));
+}
+
+function isCloudSyncBusy(statusRaw = null) {
+  const status = statusRaw && typeof statusRaw === "object" ? statusRaw : getCloudSyncStatusForProgress();
+  if (!status || status.disabled === true) {
+    return false;
+  }
+  const now = Date.now();
+  const retryAt = Math.max(0, Math.round(Number(status.retryAt) || 0));
+  return status.inFlight === true || status.pending === true || retryAt > now;
+}
+
 function resetOverflowMarquee(node) {
   if (!node) {
     return;
@@ -360,26 +410,34 @@ function renderBulkProgressToast() {
 
   if (el.bulkProgressMeta) {
     const countText = total > 0 ? `${completed}/${total}` : `${completed}`;
+    const cloudStatus = getCloudSyncStatusForProgress();
+    const cloudBusy = isCloudSyncBusy(cloudStatus);
+    const cloudEtaSeconds = getCloudSyncEtaSeconds(cloudStatus, Date.now());
+    const cloudSuffix = cloudBusy
+      ? ` · БД: ~${formatBulkEta(cloudEtaSeconds)}`
+      : cloudStatus && cloudStatus.disabled !== true && cloudStatus.lastSyncFinishedAt > 0
+        ? " · БД: сохранено"
+        : "";
     if (progress.finalState === "done") {
-      el.bulkProgressMeta.textContent = `${countText} · завершено`;
+      el.bulkProgressMeta.textContent = `${countText} · завершено${cloudSuffix}`;
     } else if (progress.finalState === "canceled") {
-      el.bulkProgressMeta.textContent = `${countText} · остановлено`;
+      el.bulkProgressMeta.textContent = `${countText} · остановлено${cloudSuffix}`;
     } else if (progress.cancelRequested) {
-      el.bulkProgressMeta.textContent = `${countText} · останавливаю…`;
+      el.bulkProgressMeta.textContent = `${countText} · останавливаю…${cloudSuffix}`;
     } else if (progress.active === true && total > 0 && progress.startedAt > 0) {
       const etaSeconds = getBulkProgressEtaSeconds(progress, elapsedMs, completed, total);
       if (Number.isFinite(etaSeconds) && etaSeconds >= 0) {
         if (total > 1 && completed > 0 && completed < total && etaSeconds <= 5) {
-          el.bulkProgressMeta.textContent = `${countText} · почти готово`;
+          el.bulkProgressMeta.textContent = `${countText} · почти готово${cloudSuffix}`;
         } else {
           const etaPrefix = total > 1 && completed === 0 ? "оценка ~" : "осталось ~";
-          el.bulkProgressMeta.textContent = `${countText} · ${etaPrefix}${formatBulkEta(etaSeconds)}`;
+          el.bulkProgressMeta.textContent = `${countText} · ${etaPrefix}${formatBulkEta(etaSeconds)}${cloudSuffix}`;
         }
       } else {
-        el.bulkProgressMeta.textContent = `${countText} · расчёт времени…`;
+        el.bulkProgressMeta.textContent = `${countText} · расчёт времени…${cloudSuffix}`;
       }
     } else {
-      el.bulkProgressMeta.textContent = `${countText} · расчёт времени…`;
+      el.bulkProgressMeta.textContent = `${countText} · расчёт времени…${cloudSuffix}`;
     }
   }
 
@@ -389,7 +447,12 @@ function renderBulkProgressToast() {
     el.bulkCancelBtn.textContent = progress.cancelRequested ? "Останавливаю…" : "Прервать";
   }
 
-  const shouldShow = progress.active || progress.finalState === "done" || progress.finalState === "canceled";
+  const cloudBusy = isCloudSyncBusy();
+  const shouldShow =
+    progress.active ||
+    progress.finalState === "done" ||
+    progress.finalState === "canceled" ||
+    cloudBusy;
   if (shouldShow) {
     ensureBulkProgressTickTimer(progress);
     el.bulkProgressToast.hidden = false;
@@ -407,7 +470,7 @@ function renderBulkProgressToast() {
   clearBulkProgressTickTimer(progress);
   setTimeout(() => {
     const current = ensureBulkProgressState();
-    if (!current.active && current.finalState === "idle" && el.bulkProgressToast) {
+    if (!current.active && current.finalState === "idle" && !isCloudSyncBusy() && el.bulkProgressToast) {
       el.bulkProgressToast.hidden = true;
     }
   }, 260);
@@ -561,12 +624,23 @@ function setBulkLoading(isLoading, loadingText = "Обновляю карточ�
     renderBulkProgressToast();
 
     clearBulkProgressHideTimer(progress);
-    progress.hideTimer = setTimeout(() => {
-      const current = ensureBulkProgressState();
-      current.finalState = "idle";
-      current.cancelRequested = false;
-      renderBulkProgressToast();
-    }, BULK_TOAST_HIDE_DELAY_MS);
+    const scheduleHide = () => {
+      clearBulkProgressHideTimer(progress);
+      progress.hideTimer = setTimeout(() => {
+        const current = ensureBulkProgressState();
+        if (isCloudSyncBusy()) {
+          current.finalState = canceled ? "canceled" : "done";
+          current.cancelRequested = false;
+          renderBulkProgressToast();
+          scheduleHide();
+          return;
+        }
+        current.finalState = "idle";
+        current.cancelRequested = false;
+        renderBulkProgressToast();
+      }, BULK_TOAST_HIDE_DELAY_MS);
+    };
+    scheduleHide();
   }
 
   syncButtonState();

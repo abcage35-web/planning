@@ -14,7 +14,32 @@ const cloudStateSync = {
   lastErrorAt: 0,
   lastAuthErrorAt: 0,
   retryDelayMs: CLOUD_STATE_SYNC_RETRY_BASE_MS,
+  retryAt: 0,
+  lastSyncStartedAt: 0,
+  lastSyncFinishedAt: 0,
+  lastSyncDurationMs: 0,
+  lastSyncOk: false,
 };
+
+function getCloudStateSyncStatus() {
+  const now = Date.now();
+  const retryAt = Number.isFinite(cloudStateSync.retryAt) ? cloudStateSync.retryAt : 0;
+  const waitingRetry = retryAt > now;
+  return {
+    disabled: isCloudStateDisabled(),
+    inFlight: cloudStateSync.inFlight === true,
+    pending: cloudStateSync.pending === true,
+    hasPayload: Boolean(cloudStateSync.latestPayload && typeof cloudStateSync.latestPayload === "object"),
+    retryDelayMs: Math.max(0, Math.round(Number(cloudStateSync.retryDelayMs) || 0)),
+    retryAt,
+    waitingRetry,
+    lastErrorAt: Math.max(0, Math.round(Number(cloudStateSync.lastErrorAt) || 0)),
+    lastSyncStartedAt: Math.max(0, Math.round(Number(cloudStateSync.lastSyncStartedAt) || 0)),
+    lastSyncFinishedAt: Math.max(0, Math.round(Number(cloudStateSync.lastSyncFinishedAt) || 0)),
+    lastSyncDurationMs: Math.max(0, Math.round(Number(cloudStateSync.lastSyncDurationMs) || 0)),
+    lastSyncOk: cloudStateSync.lastSyncOk === true,
+  };
+}
 
 function getCloudStateKey() {
   const custom = String(window.WB_DASHBOARD_CLOUD_KEY || "").trim();
@@ -138,6 +163,7 @@ async function sendCloudStatePayload(payload) {
 async function flushCloudStateSync() {
   if (cloudStateSync.inFlight) {
     cloudStateSync.pending = true;
+    cloudStateSync.retryAt = 0;
     return;
   }
 
@@ -148,8 +174,17 @@ async function flushCloudStateSync() {
 
   cloudStateSync.inFlight = true;
   cloudStateSync.pending = false;
+  cloudStateSync.retryAt = 0;
+  cloudStateSync.lastSyncStartedAt = Date.now();
 
   const ok = await sendCloudStatePayload(payload);
+  const finishedAt = Date.now();
+  cloudStateSync.lastSyncFinishedAt = finishedAt;
+  cloudStateSync.lastSyncDurationMs =
+    cloudStateSync.lastSyncStartedAt > 0
+      ? Math.max(1, finishedAt - cloudStateSync.lastSyncStartedAt)
+      : cloudStateSync.lastSyncDurationMs;
+  cloudStateSync.lastSyncOk = ok === true;
   cloudStateSync.inFlight = false;
   if (!ok) {
     cloudStateSync.lastErrorAt = Date.now();
@@ -157,6 +192,7 @@ async function flushCloudStateSync() {
       CLOUD_STATE_SYNC_RETRY_MAX_MS,
       Math.max(CLOUD_STATE_SYNC_RETRY_BASE_MS, Math.round(cloudStateSync.retryDelayMs * 1.6)),
     );
+    cloudStateSync.retryAt = Date.now() + cloudStateSync.retryDelayMs;
     clearCloudStateTimer();
     cloudStateSync.timer = setTimeout(() => {
       clearCloudStateTimer();
@@ -169,6 +205,7 @@ async function flushCloudStateSync() {
     }
   } else {
     cloudStateSync.retryDelayMs = CLOUD_STATE_SYNC_RETRY_BASE_MS;
+    cloudStateSync.retryAt = 0;
     if (typeof clearShadowPendingPayload === "function") {
       clearShadowPendingPayload();
     }
@@ -201,6 +238,7 @@ function queueCloudStateSync(payload) {
     persistShadowPendingPayload(payload);
   }
   cloudStateSync.retryDelayMs = CLOUD_STATE_SYNC_RETRY_BASE_MS;
+  cloudStateSync.retryAt = 0;
 
   clearCloudStateTimer();
   cloudStateSync.timer = setTimeout(() => {
