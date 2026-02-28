@@ -2152,6 +2152,36 @@ export async function recoverStateRowsFromVersions(db, input = {}) {
     createdAtByRowId.set(rowId, safeNullableString(row.created_at, 100));
   }
 
+  const legacyRow = await db
+    .prepare(
+      `SELECT payload_json
+       FROM dashboard_state
+       WHERE state_key = ?1
+       LIMIT 1`,
+    )
+    .bind(stateKey)
+    .first();
+  const legacyPayload = parsePayloadJson(legacyRow?.payload_json || "");
+  const legacyRowsCount = getPayloadRowsCount(legacyPayload);
+  if (legacyPayload && legacyRowsCount > currentRows.length) {
+    const saved = await saveDashboardState(db, {
+      stateKey,
+      payload: legacyPayload,
+      actorUserId: actor.userId,
+      actorLogin: actor.login,
+      actorRole: actor.role,
+      actorIp: actor.ip,
+    });
+    return {
+      ok: true,
+      stateKey,
+      restoredRows: Math.max(0, saved.rowsTotal - currentRows.length),
+      rowsTotal: saved.rowsTotal,
+      sourceRows: legacyRowsCount,
+      source: "legacy_state",
+    };
+  }
+
   const latestVersionsResult = await db
     .prepare(
       `SELECT v.*
@@ -2242,6 +2272,7 @@ export async function recoverStateRowsFromVersions(db, input = {}) {
     restoredRows,
     rowsTotal: createdAtByRowId.size,
     sourceRows: latestVersions.length,
+    source: "versions",
   };
 }
 
