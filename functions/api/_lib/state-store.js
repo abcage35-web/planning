@@ -14,6 +14,7 @@ const WRITE_SAVE_EVENTS = false;
 let tablesEnsured = false;
 let tablesEnsurePromise = null;
 const compactedStateKeys = new Set();
+const ENABLE_HOTPATH_COMPACTION = false;
 
 const REQUIRED_TABLES = [
   "dashboard_state",
@@ -27,6 +28,9 @@ const REQUIRED_TABLES = [
 ];
 
 async function maybeCompactStateStorage(db, stateKey, savedAtIso, nowIso) {
+  if (!ENABLE_HOTPATH_COMPACTION) {
+    return;
+  }
   const key = safeString(stateKey, 120) || DEFAULT_STATE_KEY;
   if (!key || compactedStateKeys.has(key)) {
     return;
@@ -781,8 +785,13 @@ async function getLatestRowLogsForRows(db, stateKey, rowIdsRaw) {
   const sql = `SELECT row_id, log_id, at, source, mode, action_key, status, error, changes_json
     FROM dashboard_row_logs
     WHERE state_key = ?1
-      AND row_id IN (${placeholders})
-    ORDER BY row_id ASC, at DESC, log_id DESC`;
+      AND rowid IN (
+        SELECT MAX(rowid)
+        FROM dashboard_row_logs
+        WHERE state_key = ?1
+          AND row_id IN (${placeholders})
+        GROUP BY row_id
+      )`;
 
   const result = await db
     .prepare(sql)
