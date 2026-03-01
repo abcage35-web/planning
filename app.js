@@ -202,7 +202,7 @@ const state = {
   onlyErrors: false,
   notLoadedOnly: false,
   checksFiltersOpen: false,
-  globalFiltersCollapsed: false,
+  globalFiltersCollapsed: true,
   globalCategoriesOpen: false,
   categorySearchQuery: "",
   globalColumnsOpen: false,

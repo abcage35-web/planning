@@ -931,7 +931,7 @@ function applyParsedState(parsed) {
   state.onlyErrors = Boolean(parsed.onlyErrors);
   state.notLoadedOnly = Boolean(parsed.notLoadedOnly);
   state.checksFiltersOpen = Boolean(parsed.checksFiltersOpen);
-  state.globalFiltersCollapsed = Boolean(parsed.globalFiltersCollapsed);
+  state.globalFiltersCollapsed = true;
   state.globalCategoriesOpen = Boolean(parsed.globalCategoriesOpen);
   state.categorySearchQuery = String(parsed.categorySearchQuery || "").slice(0, 120);
   state.globalColumnsOpen = Boolean(parsed.globalColumnsOpen);
@@ -997,7 +997,7 @@ function resetStateToDefaults() {
   state.onlyErrors = false;
   state.notLoadedOnly = false;
   state.checksFiltersOpen = false;
-  state.globalFiltersCollapsed = false;
+  state.globalFiltersCollapsed = true;
   state.globalCategoriesOpen = false;
   state.categorySearchQuery = "";
   state.globalColumnsOpen = false;
