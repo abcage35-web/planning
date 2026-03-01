@@ -8,16 +8,16 @@ function applyControlsState() {
   if (state.controlsCollapsed) {
     el.controlsPanel.classList.add("controls-collapsed");
     if (typeof setStaticButtonIcon === "function") {
-      setStaticButtonIcon(el.toggleControlsBtn, "chevronDown", "Показать блок заполнения");
+      setStaticButtonIcon(el.toggleControlsBtn, "chevronDown", "Развернуть");
     } else {
-      el.toggleControlsBtn.textContent = "Показать блок заполнения";
+      el.toggleControlsBtn.textContent = "Развернуть";
     }
   } else {
     el.controlsPanel.classList.remove("controls-collapsed");
     if (typeof setStaticButtonIcon === "function") {
-      setStaticButtonIcon(el.toggleControlsBtn, "chevronUp", "Скрыть блок заполнения");
+      setStaticButtonIcon(el.toggleControlsBtn, "chevronUp", "Свернуть");
     } else {
-      el.toggleControlsBtn.textContent = "Скрыть блок заполнения";
+      el.toggleControlsBtn.textContent = "Свернуть";
     }
   }
 }

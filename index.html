@@ -31,6 +31,13 @@
 
     <main class="app-shell">
       <div id="mainView" class="view-screen">
+        <div id="startupLoading" class="startup-loading" aria-live="polite" aria-busy="true">
+          <div class="startup-loading-card">
+            <span class="startup-loading-spinner" aria-hidden="true"></span>
+            <span id="startupLoadingText" class="startup-loading-text">Загружаю данные…</span>
+          </div>
+        </div>
+
         <section id="globalFiltersFrame" class="panel global-filters-frame reveal">
           <div class="global-filters-head">
             <div class="global-filters-head-main">
@@ -206,11 +213,10 @@
               </p>
             </div>
             <div class="btn-row btn-row-top">
-              <button id="loadAllBtn" class="btn btn-primary btn-has-icon" type="button">Обновить карточки</button>
-              <button id="downloadExportBtn" class="btn btn-mini btn-has-icon" type="button">Скачать таблицу</button>
+              <button id="loadAllBtn" class="btn btn-primary btn-has-icon" type="button">Обновить</button>
+              <button id="downloadExportBtn" class="btn btn-mini btn-has-icon" type="button">Скачать .csv</button>
               <button id="errorDetailsBtn" class="btn btn-mini" type="button" hidden>Показать ошибки</button>
-              <button id="loadProblemBtn" class="btn btn-problem btn-has-icon" type="button">Обновить проблемные</button>
-              <button id="toggleControlsBtn" class="btn btn-has-icon" type="button">Скрыть блок заполнения</button>
+              <button id="toggleControlsBtn" class="btn btn-has-icon" type="button">Свернуть</button>
             </div>
           </div>
 

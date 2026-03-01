@@ -491,8 +491,7 @@ function setBulkLoading(isLoading, loadingText = "Обновляю карточ�
     typeof BULK_ACTION_LABELS === "object" && BULK_ACTION_LABELS
       ? BULK_ACTION_LABELS
       : {
-          all: "Обновить карточки",
-          problem: "Обновить проблемные",
+          all: "Обновить",
         };
 
   const progress = ensureBulkProgressState();
@@ -504,15 +503,6 @@ function setBulkLoading(isLoading, loadingText = "Обновляю карточ�
       setStaticButtonIcon(el.loadAllBtn, "refresh", loadAllLabel);
     } else {
       el.loadAllBtn.textContent = loadAllLabel;
-    }
-  }
-  if (!state.isBulkLoading && el.loadProblemBtn) {
-    const hasProblems = getProblemRowIds().length;
-    const loadProblemLabel = hasProblems > 0 ? `${labels.problem} (${hasProblems})` : labels.problem;
-    if (typeof setStaticButtonIcon === "function") {
-      setStaticButtonIcon(el.loadProblemBtn, "refresh", loadProblemLabel);
-    } else {
-      el.loadProblemBtn.textContent = loadProblemLabel;
     }
   }
 
@@ -641,10 +631,6 @@ function syncButtonState() {
   el.loadAllBtn.disabled = disabled;
   if (el.downloadExportBtn) {
     el.downloadExportBtn.disabled = disabled;
-  }
-  if (el.loadProblemBtn) {
-    const hasProblems = getProblemRowIds().length > 0;
-    el.loadProblemBtn.disabled = disabled || !hasProblems;
   }
   if (el.addSingleBtn) {
     el.addSingleBtn.disabled = disabled;

@@ -1066,7 +1066,7 @@ async function handleDownloadExport() {
     return;
   }
 
-  const initialLabel = "Скачать таблицу";
+  const initialLabel = "Скачать .csv";
   el.downloadExportBtn.disabled = true;
   if (typeof setStaticButtonIcon === "function") {
     setStaticButtonIcon(el.downloadExportBtn, "download", "Формирую CSV...");
@@ -1114,133 +1114,12 @@ async function loadFilteredRowsByMode({ loadingText = "Обновляю карт
   );
 }
 
-function getProblemRowIds() {
-  return state.rows.filter((row) => Boolean(row.error)).map((row) => row.id);
-}
-
 function handleBulkCancel() {
   if (!state.isBulkLoading) {
     return;
   }
   if (typeof requestBulkLoadingCancel === "function") {
     requestBulkLoadingCancel();
-  }
-}
-
-async function handleLoadProblematic() {
-  if (state.isBulkLoading) {
-    return;
-  }
-
-  const problemRowIds = getProblemRowIds();
-  if (problemRowIds.length === 0) {
-    window.alert("Проблемных карточек с ошибками загрузки сейчас нет.");
-    return;
-  }
-
-  if (el.loadProblemBtn) {
-    if (typeof setStaticButtonIcon === "function") {
-      setStaticButtonIcon(el.loadProblemBtn, "loader", "Обновляю проблемные...");
-    } else {
-      el.loadProblemBtn.textContent = "Обновляю проблемные...";
-    }
-  }
-
-  const total = problemRowIds.length;
-  let completed = 0;
-  let canceled = false;
-
-  try {
-    setBulkLoading(true, `Обновляю проблемные (0/${total})...`, "problem", {
-      reset: true,
-      total,
-      completed: 0,
-      cancellable: true,
-      concurrency: 1,
-    });
-
-    for (let index = 0; index < total; index += 1) {
-      if (typeof isBulkLoadingCancelRequested === "function" && isBulkLoadingCancelRequested()) {
-        canceled = true;
-        break;
-      }
-      const rowId = problemRowIds[index];
-      if (el.loadProblemBtn) {
-        const progressLabel = `Проблемные: ${index + 1}/${total}`;
-        if (typeof setStaticButtonIcon === "function") {
-          setStaticButtonIcon(el.loadProblemBtn, "loader", progressLabel);
-        } else {
-          el.loadProblemBtn.textContent = progressLabel;
-        }
-      }
-      await loadRow(rowId, {
-        forceHostProbe: true,
-        source: "manual",
-        actionKey: "problem",
-        recordProblemSnapshot: false,
-      });
-      const freshRow = getRowById(rowId);
-      if (
-        freshRow?.error &&
-        isRetriableRowError(freshRow.error) &&
-        !(typeof isBulkLoadingCancelRequested === "function" && isBulkLoadingCancelRequested())
-      ) {
-        await sleep(720);
-        await loadRow(rowId, {
-          forceHostProbe: true,
-          source: "manual",
-          actionKey: "problem-retry",
-          recordProblemSnapshot: false,
-        });
-      }
-
-      completed += 1;
-      const cancelRequested =
-        typeof isBulkLoadingCancelRequested === "function" && isBulkLoadingCancelRequested();
-      setBulkLoading(true, `Обновляю проблемные (${completed}/${total})...`, "problem", {
-        total,
-        completed,
-        cancellable: true,
-        cancelRequested,
-        concurrency: 1,
-      });
-
-      if (cancelRequested) {
-        canceled = true;
-        break;
-      }
-
-      if (index < total - 1) {
-        await sleep(160);
-      }
-    }
-
-    if (typeof isBulkLoadingCancelRequested === "function" && isBulkLoadingCancelRequested()) {
-      canceled = true;
-    }
-
-    state.lastSyncAt = new Date().toISOString();
-    if (typeof recordProblemSnapshot === "function") {
-      recordProblemSnapshot({
-        source: "manual",
-        actionKey: "problem",
-        mode: "full",
-      });
-    }
-  } finally {
-    setBulkLoading(
-      false,
-      canceled ? `Обновление остановлено (${completed}/${total})` : "Обновление завершено",
-      "problem",
-      {
-        total,
-        completed,
-        canceled,
-        concurrency: 1,
-      },
-    );
-    renderSummary();
-    syncButtonState();
   }
 }
 

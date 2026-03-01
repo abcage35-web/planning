@@ -40,12 +40,11 @@ const TABLE_COLUMNS = 8;
 const DUPLICATE_CHECK_TIMEOUT_MS = 9000;
 const ICON_HINT_DELAY_MS = 450;
 const UPDATE_LOG_LIMIT = 240;
-const CLOUD_SAVE_LOGS_PER_ROW = 16;
+const CLOUD_SAVE_LOGS_PER_ROW = 100;
 const PROBLEM_SNAPSHOT_LIMIT = 4000;
 const BULK_TOAST_HIDE_DELAY_MS = 1400;
 const BULK_ACTION_LABELS = {
-  all: "Обновить карточки",
-  problem: "Обновить проблемные",
+  all: "Обновить",
   scheduled: "Фоновое обновление",
 };
 
@@ -283,6 +282,8 @@ const richGallery = {
 
 const el = {
   mainView: document.getElementById("mainView"),
+  startupLoading: document.getElementById("startupLoading"),
+  startupLoadingText: document.getElementById("startupLoadingText"),
   authGate: document.getElementById("authGate"),
   authForm: document.getElementById("authForm"),
   authLoginInput: document.getElementById("authLoginInput"),
@@ -318,7 +319,6 @@ const el = {
   addBulkBtn: document.getElementById("addBulkBtn"),
   loadAllBtn: document.getElementById("loadAllBtn"),
   downloadExportBtn: document.getElementById("downloadExportBtn"),
-  loadProblemBtn: document.getElementById("loadProblemBtn"),
   clearBtn: document.getElementById("clearBtn"),
   filtersRow: document.getElementById("filtersRow"),
   filterNmId: document.getElementById("filterNmId"),
@@ -379,10 +379,14 @@ const el = {
   problemsChartContent: document.getElementById("problemsChartContent"),
 };
 
-init().catch(() => {});
+init().catch(() => {
+  setStartupLoading(false);
+});
 
 async function init() {
+  setStartupLoading(true, "Проверяю доступ…");
   await restoreAuthState();
+  setStartupLoading(true, "Загружаю данные…");
   await restoreState();
   state.sellerSettings = normalizeSellerSettings(state.sellerSettings);
   state.colorVariantsCache = normalizeColorVariantCache(state.colorVariantsCache);
@@ -404,6 +408,7 @@ async function init() {
     initShadowUpdateScheduler();
   }
   registerServiceWorker();
+  setStartupLoading(false);
 }
 
 function renderIcon(name, className = "") {
@@ -428,10 +433,13 @@ function hydrateStaticIcons() {
   setStaticButtonIcon(el.previewPrevBtn, "chevronLeft");
   setStaticButtonIcon(el.previewNextBtn, "chevronRight");
   setStaticButtonIcon(el.logoutBtn, "logOut");
-  setStaticButtonIcon(el.loadAllBtn, "refresh", "Обновить карточки");
-  setStaticButtonIcon(el.loadProblemBtn, "refresh", "Обновить проблемные");
-  setStaticButtonIcon(el.toggleControlsBtn, state.controlsCollapsed ? "chevronDown" : "chevronUp", state.controlsCollapsed ? "Показать блок заполнения" : "Скрыть блок заполнения");
-  setStaticButtonIcon(el.downloadExportBtn, "download", "Скачать таблицу");
+  setStaticButtonIcon(el.loadAllBtn, "refresh", "Обновить");
+  setStaticButtonIcon(
+    el.toggleControlsBtn,
+    state.controlsCollapsed ? "chevronDown" : "chevronUp",
+    state.controlsCollapsed ? "Развернуть" : "Свернуть",
+  );
+  setStaticButtonIcon(el.downloadExportBtn, "download", "Скачать .csv");
   syncAuthPasswordToggleIcon();
 }
 
@@ -568,16 +576,32 @@ async function restoreAuthState() {
 }
 
 async function syncStateAfterAuth() {
-  await restoreState({ preferRemote: true });
-  state.sellerSettings = normalizeSellerSettings(state.sellerSettings);
-  state.colorVariantsCache = normalizeColorVariantCache(state.colorVariantsCache);
-  renderCabinetFilterOptions();
-  renderFilterInputs();
-  applyAutoplayLimitControl();
-  applyTagsLimitControl();
-  applyRowsLimitControl();
-  applyTableSortControls();
-  render();
+  setStartupLoading(true, "Загружаю данные…");
+  try {
+    await restoreState({ preferRemote: true });
+    state.sellerSettings = normalizeSellerSettings(state.sellerSettings);
+    state.colorVariantsCache = normalizeColorVariantCache(state.colorVariantsCache);
+    renderCabinetFilterOptions();
+    renderFilterInputs();
+    applyAutoplayLimitControl();
+    applyTagsLimitControl();
+    applyRowsLimitControl();
+    applyTableSortControls();
+    render();
+  } finally {
+    setStartupLoading(false);
+  }
+}
+
+function setStartupLoading(isActive, text = "Загружаю данные…") {
+  if (!el.startupLoading) {
+    return;
+  }
+  if (el.startupLoadingText) {
+    el.startupLoadingText.textContent = String(text || "Загружаю данные…").trim() || "Загружаю данные…";
+  }
+  el.startupLoading.hidden = isActive !== true;
+  el.startupLoading.setAttribute("aria-busy", isActive === true ? "true" : "false");
 }
 
 function getAuthErrorMessage(response, fallback) {
@@ -757,9 +781,6 @@ function bindEvents() {
   el.loadAllBtn.addEventListener("click", handleLoadAll);
   if (el.downloadExportBtn) {
     el.downloadExportBtn.addEventListener("click", handleDownloadExport);
-  }
-  if (el.loadProblemBtn) {
-    el.loadProblemBtn.addEventListener("click", handleLoadProblematic);
   }
   if (el.clearBtn) {
     el.clearBtn.addEventListener("click", handleClear);
