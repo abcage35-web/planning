@@ -4013,6 +4013,17 @@ tbody tr:hover {
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--series-color, #0b738a) 45%, #ffffff));
 }
 
+.problems-chart-point-value {
+  fill: color-mix(in srgb, var(--series-color, #0b738a) 74%, #0f2533);
+  font: 600 9px/1 "IBM Plex Sans", sans-serif;
+  text-anchor: middle;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 2.6px;
+  stroke-linejoin: round;
+}
+
 .sellers-content {
   display: grid;
   gap: 12px;

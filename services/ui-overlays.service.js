@@ -2045,6 +2045,104 @@ function collapseSnapshotsByDay(snapshotsRaw) {
   return dayOrder.map((dayKey) => latestByDay.get(dayKey)).filter(Boolean);
 }
 
+function parseSnapshotDayKey(dayKeyRaw) {
+  const dayKey = String(dayKeyRaw || "").trim();
+  const match = dayKey.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
+  const date = new Date(year, month - 1, day);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date;
+}
+
+function addDays(dateRaw, daysRaw) {
+  const date = dateRaw instanceof Date ? new Date(dateRaw.getTime()) : new Date();
+  const days = Number(daysRaw) || 0;
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function isSameOrBeforeDay(leftRaw, rightRaw) {
+  const left = leftRaw instanceof Date ? leftRaw : null;
+  const right = rightRaw instanceof Date ? rightRaw : null;
+  if (!left || !right) {
+    return false;
+  }
+  return left.getTime() <= right.getTime();
+}
+
+function buildDailySnapshotsWithCarry(snapshotsRaw) {
+  const snapshotsByTime = (Array.isArray(snapshotsRaw) ? snapshotsRaw : [])
+    .filter((item) => item && typeof item === "object" && item.at)
+    .slice()
+    .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  const dailySnapshots = collapseSnapshotsByDay(snapshotsByTime);
+  if (dailySnapshots.length <= 0) {
+    return [];
+  }
+
+  const firstDayKey = getSnapshotDayKey(dailySnapshots[0]?.at);
+  const lastDayKey = getSnapshotDayKey(dailySnapshots[dailySnapshots.length - 1]?.at);
+  const firstDay = parseSnapshotDayKey(firstDayKey);
+  const lastDay = parseSnapshotDayKey(lastDayKey);
+  if (!firstDay || !lastDay) {
+    return dailySnapshots;
+  }
+
+  const latestByDay = new Map();
+  for (const snapshot of dailySnapshots) {
+    const key = getSnapshotDayKey(snapshot?.at);
+    if (key) {
+      latestByDay.set(key, snapshot);
+    }
+  }
+
+  const result = [];
+  let cursor = new Date(firstDay.getTime());
+  let lastKnownSnapshot = null;
+  while (isSameOrBeforeDay(cursor, lastDay)) {
+    const dayKey = getSnapshotDayKey(cursor);
+    const exactSnapshot = latestByDay.get(dayKey) || null;
+    if (exactSnapshot) {
+      lastKnownSnapshot = exactSnapshot;
+      result.push({
+        ...exactSnapshot,
+        dayKey,
+        isCarryForward: false,
+      });
+    } else if (lastKnownSnapshot) {
+      const sourceAt = new Date(lastKnownSnapshot.at);
+      const carriedAt = new Date(
+        cursor.getFullYear(),
+        cursor.getMonth(),
+        cursor.getDate(),
+        Number.isNaN(sourceAt.getTime()) ? 0 : sourceAt.getHours(),
+        Number.isNaN(sourceAt.getTime()) ? 0 : sourceAt.getMinutes(),
+        Number.isNaN(sourceAt.getTime()) ? 0 : sourceAt.getSeconds(),
+      ).toISOString();
+      result.push({
+        ...lastKnownSnapshot,
+        at: carriedAt,
+        dayKey,
+        isCarryForward: true,
+        carryFromAt: lastKnownSnapshot.at,
+      });
+    }
+    cursor = addDays(cursor, 1);
+  }
+
+  return result;
+}
+
 function renderProblemsChartCabinetFilter() {
   if (!el.problemsChartCabinetFilter) {
     return;
@@ -2103,7 +2201,7 @@ function renderProblemsChartContent() {
     .slice()
     .filter((item) => item && typeof item === "object" && item.at)
     .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
-  const snapshots = collapseSnapshotsByDay(snapshotsByTime);
+  const snapshots = buildDailySnapshotsWithCarry(snapshotsByTime);
   const cabinet = normalizeProblemsChartCabinetFilter(state.chartCabinetFilter, snapshotsByTime);
   state.chartCabinetFilter = cabinet;
 
@@ -2132,9 +2230,14 @@ function renderProblemsChartContent() {
       }).format(atDate),
       values,
       total,
-      source: snapshot.source === "system" ? "Системное" : "Ручное",
+      source: snapshot.isCarryForward
+        ? "Без обновления (взято из предыдущего дня)"
+        : snapshot.source === "system"
+          ? "Системное"
+          : "Ручное",
       action: getActionLabel(snapshot.actionKey),
       mode: getModeLabel(snapshot.mode),
+      isCarryForward: snapshot.isCarryForward === true,
     };
   });
 
@@ -2147,27 +2250,24 @@ function renderProblemsChartContent() {
   const plotWidth = width - padLeft - padRight;
   const plotHeight = height - padTop - padBottom;
 
-  const times = points.map((item) => item.at.getTime()).filter(Number.isFinite);
-  const minTime = times.length > 0 ? Math.min(...times) : Date.now();
-  const maxTime = times.length > 0 ? Math.max(...times) : minTime;
   const values = points.flatMap((item) => seriesConfig.map((series) => Number(item.values[series.key]) || 0));
   const minValue = 0;
   const maxValue = Math.max(1, ...values);
   const valueRange = Math.max(1, maxValue - minValue);
-  const timeRange = Math.max(1, maxTime - minTime);
 
   const mapped = points.map((point) => {
-    const timeValue = point.at.getTime();
-    const xByTime = Number.isFinite(timeValue) ? (timeValue - minTime) / timeRange : 0;
     const xByIndex = points.length > 1 ? point.index / (points.length - 1) : 0.5;
-    const xRatio = Number.isFinite(timeValue) && maxTime !== minTime ? xByTime : xByIndex;
+    const xRatio = xByIndex;
     const x = padLeft + xRatio * plotWidth;
     const yBySeries = {};
+    const valueLabelYBySeries = {};
     for (const series of seriesConfig) {
       const value = Math.max(0, Number(point.values[series.key]) || 0);
-      yBySeries[series.key] = padTop + (1 - (value - minValue) / valueRange) * plotHeight;
+      const y = padTop + (1 - (value - minValue) / valueRange) * plotHeight;
+      yBySeries[series.key] = y;
+      valueLabelYBySeries[series.key] = Math.max(10, y - 8);
     }
-    return { ...point, x, yBySeries };
+    return { ...point, x, yBySeries, valueLabelYBySeries };
   });
 
   const yTicks = 4;
@@ -2211,7 +2311,13 @@ function renderProblemsChartContent() {
 
       const seriesPointsHtml = mapped
         .map(
-          (point) => `<circle
+          (point) => `<text
+              class="problems-chart-point-value"
+              style="--series-color:${escapeAttr(series.color)}"
+              x="${point.x.toFixed(2)}"
+              y="${Number(point.valueLabelYBySeries[series.key]).toFixed(2)}"
+            >${escapeHtml(String(point.values[series.key]))}</text>
+            <circle
               class="problems-chart-point"
               style="--series-color:${escapeAttr(series.color)}"
               data-tooltip-kind="chart"
