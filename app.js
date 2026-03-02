@@ -1,5 +1,6 @@
 const STORAGE_KEY = "wb-dashboard-v2";
 const AUTH_FETCH_TIMEOUT_MS = 9000;
+const AUTH_LOGIN_FETCH_TIMEOUT_MS = 35000;
 const AUTH_ENDPOINTS = Object.freeze({
   login: "/api/auth/login",
   me: "/api/auth/me",
@@ -511,8 +512,12 @@ function getAuthEndpointUrl(pathRaw) {
 async function runAuthRequest(path, options = {}) {
   const method = String(options.method || "GET").toUpperCase();
   const bodyPayload = options.body && typeof options.body === "object" ? options.body : null;
+  const timeoutMs = Math.max(
+    1000,
+    Number.isFinite(Number(options.timeoutMs)) ? Number(options.timeoutMs) : AUTH_FETCH_TIMEOUT_MS,
+  );
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), AUTH_FETCH_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const headers = {};
@@ -535,11 +540,13 @@ async function runAuthRequest(path, options = {}) {
       status: response.status,
       data,
     };
-  } catch {
+  } catch (error) {
+    const errorKind = error?.name === "AbortError" ? "timeout" : "network";
     return {
       ok: false,
       status: 0,
       data: null,
+      errorKind,
     };
   } finally {
     clearTimeout(timeoutId);
@@ -605,6 +612,12 @@ function setStartupLoading(isActive, text = "Загружаю данные…") 
 }
 
 function getAuthErrorMessage(response, fallback) {
+  if (Number(response?.status) === 0) {
+    if (response?.errorKind === "timeout") {
+      return "Сервер долго отвечает. Попробуйте снова через 5–10 секунд.";
+    }
+    return "Ошибка сети при входе. Проверьте соединение и попробуйте снова.";
+  }
   const payload = response?.data;
   const errorText = payload && typeof payload === "object" ? String(payload.error || "").trim() : "";
   return errorText || fallback;
@@ -623,6 +636,7 @@ async function handleAuthSubmit(event) {
   const response = await runAuthRequest(AUTH_ENDPOINTS.login, {
     method: "POST",
     body: { login, password },
+    timeoutMs: AUTH_LOGIN_FETCH_TIMEOUT_MS,
   });
 
   if (!response.ok) {
