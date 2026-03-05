@@ -762,6 +762,7 @@ function buildStatePayload(savedAtRaw = null, overrides = {}) {
     })),
     basketByVol: sourceBasketByVol,
     lastSyncAt: sourceLastSyncAt,
+    activePage: typeof normalizeActivePage === "function" ? normalizeActivePage(state.activePage) : "cards",
     filters: state.filters,
     controlsCollapsed: state.controlsCollapsed,
     rowsLimit: state.rowsLimit,
@@ -922,6 +923,12 @@ function applyParsedState(parsed) {
 
   state.basketByVol = parsed.basketByVol && typeof parsed.basketByVol === "object" ? parsed.basketByVol : {};
   state.lastSyncAt = parsed.lastSyncAt || null;
+  state.activePage =
+    typeof normalizeActivePage === "function"
+      ? normalizeActivePage(parsed.activePage)
+      : String(parsed.activePage || "").trim().toLowerCase() === "ab-tests"
+        ? "ab-tests"
+        : "cards";
   state.controlsCollapsed = Boolean(parsed.controlsCollapsed);
   state.rowsLimit = normalizeRowsLimit(parsed.rowsLimit);
   state.autoplayLimitPerCabinet = normalizeAutoplayLimit(parsed.autoplayLimitPerCabinet);
@@ -988,6 +995,7 @@ function resetStateToDefaults() {
   state.rows = [];
   state.basketByVol = {};
   state.lastSyncAt = null;
+  state.activePage = "cards";
   state.controlsCollapsed = false;
   state.rowsLimit = ROWS_LIMIT_DEFAULT;
   state.autoplayLimitPerCabinet = AUTOPLAY_LIMIT_DEFAULT;

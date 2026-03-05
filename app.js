@@ -197,6 +197,7 @@ const state = {
   filters: { ...FILTER_DEFAULTS },
   isBulkLoading: false,
   lastSyncAt: null,
+  activePage: "cards",
   controlsCollapsed: false,
   rowsLimit: ROWS_LIMIT_DEFAULT,
   rowsPage: 1,
@@ -283,6 +284,13 @@ const richGallery = {
 
 const el = {
   mainView: document.getElementById("mainView"),
+  cardsPage: document.getElementById("cardsPage"),
+  abTestsPage: document.getElementById("abTestsPage"),
+  switchToCardsPageBtn: document.getElementById("switchToCardsPageBtn"),
+  switchToAbPageBtn: document.getElementById("switchToAbPageBtn"),
+  abTestsRefreshBtn: document.getElementById("abTestsRefreshBtn"),
+  abTestsContent: document.getElementById("abTestsContent"),
+  abTestsMetaLine: document.getElementById("abTestsMetaLine"),
   startupLoading: document.getElementById("startupLoading"),
   startupLoadingText: document.getElementById("startupLoadingText"),
   authGate: document.getElementById("authGate"),
@@ -401,7 +409,9 @@ async function init() {
   applyTagsLimitControl();
   applyRowsLimitControl();
   applyTableSortControls();
+  applyActivePage({ ensureLoad: false });
   render();
+  applyActivePage({ ensureLoad: true });
   if (typeof ensureProblemSnapshotsInitialized === "function") {
     ensureProblemSnapshotsInitialized();
   }
@@ -435,12 +445,21 @@ function hydrateStaticIcons() {
   setStaticButtonIcon(el.previewNextBtn, "chevronRight");
   setStaticButtonIcon(el.logoutBtn, "logOut");
   setStaticButtonIcon(el.loadAllBtn, "refresh", "Обновить");
+  if (el.switchToCardsPageBtn) {
+    setStaticButtonIcon(el.switchToCardsPageBtn, "dashboard", "Карточки");
+  }
+  if (el.switchToAbPageBtn) {
+    setStaticButtonIcon(el.switchToAbPageBtn, "chartLine", "AB-тесты");
+  }
   setStaticButtonIcon(
     el.toggleControlsBtn,
     state.controlsCollapsed ? "chevronDown" : "chevronUp",
     state.controlsCollapsed ? "Развернуть" : "Свернуть",
   );
   setStaticButtonIcon(el.downloadExportBtn, "download", "Скачать .xlsx");
+  if (el.abTestsRefreshBtn) {
+    setStaticButtonIcon(el.abTestsRefreshBtn, "refresh", "Обновить данные");
+  }
   syncAuthPasswordToggleIcon();
 }
 
@@ -594,7 +613,9 @@ async function syncStateAfterAuth() {
     applyTagsLimitControl();
     applyRowsLimitControl();
     applyTableSortControls();
+    applyActivePage({ ensureLoad: false });
     render();
+    applyActivePage({ ensureLoad: true });
   } finally {
     setStartupLoading(false);
   }
@@ -609,6 +630,55 @@ function setStartupLoading(isActive, text = "Загружаю данные…") 
   }
   el.startupLoading.hidden = isActive !== true;
   el.startupLoading.setAttribute("aria-busy", isActive === true ? "true" : "false");
+}
+
+function normalizeActivePage(valueRaw) {
+  const value = String(valueRaw || "")
+    .trim()
+    .toLowerCase();
+  return value === "ab" || value === "ab-tests" ? "ab-tests" : "cards";
+}
+
+function applyActivePage(options = {}) {
+  const shouldEnsureLoad = options && options.ensureLoad === true;
+  const activePage = normalizeActivePage(state.activePage);
+  state.activePage = activePage;
+  const isAbPage = activePage === "ab-tests";
+
+  if (el.cardsPage) {
+    el.cardsPage.hidden = isAbPage;
+  }
+  if (el.abTestsPage) {
+    el.abTestsPage.hidden = !isAbPage;
+  }
+
+  if (el.switchToCardsPageBtn) {
+    el.switchToCardsPageBtn.classList.toggle("is-active", !isAbPage);
+    el.switchToCardsPageBtn.setAttribute("aria-selected", !isAbPage ? "true" : "false");
+  }
+  if (el.switchToAbPageBtn) {
+    el.switchToAbPageBtn.classList.toggle("is-active", isAbPage);
+    el.switchToAbPageBtn.setAttribute("aria-selected", isAbPage ? "true" : "false");
+  }
+
+  if (isAbPage && shouldEnsureLoad && typeof ensureAbDashboardLoaded === "function") {
+    ensureAbDashboardLoaded();
+  }
+
+  if (typeof syncGlobalFilterOffset === "function") {
+    requestAnimationFrame(syncGlobalFilterOffset);
+  }
+}
+
+function setActivePage(pageRaw, options = {}) {
+  const nextPage = normalizeActivePage(pageRaw);
+  const changed = nextPage !== state.activePage;
+  state.activePage = nextPage;
+  applyActivePage({ ensureLoad: true });
+
+  if (changed && options && options.persist === true) {
+    persistState();
+  }
 }
 
 function getAuthErrorMessage(response, fallback) {
@@ -782,6 +852,19 @@ function bindEvents() {
   }
   if (el.authPasswordToggleBtn) {
     el.authPasswordToggleBtn.addEventListener("click", handleToggleAuthPasswordVisibility);
+  }
+  if (el.switchToCardsPageBtn) {
+    el.switchToCardsPageBtn.addEventListener("click", () => setActivePage("cards", { persist: true }));
+  }
+  if (el.switchToAbPageBtn) {
+    el.switchToAbPageBtn.addEventListener("click", () => setActivePage("ab-tests", { persist: true }));
+  }
+  if (el.abTestsRefreshBtn) {
+    el.abTestsRefreshBtn.addEventListener("click", () => {
+      if (typeof refreshAbDashboardData === "function") {
+        refreshAbDashboardData();
+      }
+    });
   }
   if (el.logoutBtn) {
     el.logoutBtn.addEventListener("click", handleLogout);

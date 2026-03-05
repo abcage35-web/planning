@@ -20,6 +20,7 @@
     <script src="./services/ui-table.service.js" defer></script>
     <script src="./services/ui-problems.service.js" defer></script>
     <script src="./services/ui-dashboard.service.js" defer></script>
+    <script src="./services/ui-ab-dashboard.service.js" defer></script>
     <script src="./services/ui-overlays.service.js" defer></script>
     <script src="./services/cloud-state.service.js" defer></script>
     <script src="./services/app-runtime-utils.service.js" defer></script>
@@ -38,6 +39,18 @@
           </div>
         </div>
 
+        <section class="panel page-switch-panel reveal">
+          <div class="page-switch-row" role="tablist" aria-label="Переключение страниц">
+            <button id="switchToCardsPageBtn" class="page-switch-btn is-active" type="button" role="tab" aria-selected="true">
+              Карточки
+            </button>
+            <button id="switchToAbPageBtn" class="page-switch-btn" type="button" role="tab" aria-selected="false">
+              AB‑тесты
+            </button>
+          </div>
+        </section>
+
+        <div id="cardsPage" class="view-page is-active">
         <section id="globalFiltersFrame" class="panel global-filters-frame reveal">
           <div class="global-filters-head">
             <div class="global-filters-head-main">
@@ -311,6 +324,30 @@
             </table>
           </div>
         </section>
+        </div>
+
+        <div id="abTestsPage" class="view-page ab-tests-page" hidden>
+          <section class="panel ab-tests-panel reveal">
+            <div class="ab-tests-head">
+              <div class="ab-tests-head-main">
+                <p class="eyebrow">AB‑тесты</p>
+                <h2>Дашборд AB‑тестов обложек</h2>
+                <p id="abTestsMetaLine" class="subtle">
+                  Источники: (*) Подложка, (*) Техническая выгрузка, (*) Результаты по обложкам XWAY.
+                </p>
+              </div>
+              <div class="ab-tests-head-actions">
+                <button id="abTestsRefreshBtn" class="btn btn-primary btn-has-icon" type="button">Обновить данные</button>
+              </div>
+            </div>
+            <div id="abTestsContent" class="ab-tests-content">
+              <div class="ab-tests-state-card">
+                <span class="ab-tests-state-spinner" aria-hidden="true"></span>
+                <span>Подготовка дашборда AB‑тестов…</span>
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
     </main>
 
