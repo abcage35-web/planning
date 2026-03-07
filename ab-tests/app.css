@@ -571,6 +571,7 @@ body {
   display: grid;
   grid-template-columns: minmax(300px, 1fr) minmax(440px, 1.6fr) minmax(280px, 0.9fr);
   gap: 10px;
+  align-items: stretch;
 }
 
 .ab-test-left,
@@ -746,9 +747,13 @@ body {
 
 .ab-test-center {
   min-width: 0;
+  display: flex;
 }
 
 .ab-matrix-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
   overflow: auto;
   border: 1px solid rgba(22, 56, 71, 0.16);
   border-radius: 10px;
@@ -757,6 +762,7 @@ body {
 
 .ab-variant-matrix {
   width: 100%;
+  height: 100%;
   min-width: 720px;
   border-collapse: collapse;
 }
