@@ -547,12 +547,6 @@ body {
   color: #8b2f21;
 }
 
-.ab-status-pill.is-auto {
-  border-color: rgba(59, 130, 246, 0.34);
-  background: rgba(59, 130, 246, 0.14);
-  color: #1d4f89;
-}
-
 .ab-status-pill.is-neutral {
   border-color: rgba(245, 158, 11, 0.34);
   background: rgba(245, 158, 11, 0.14);
@@ -835,12 +829,6 @@ body {
   color: #8b2f21;
   background: rgba(249, 115, 96, 0.14);
   border-color: rgba(249, 115, 96, 0.35);
-}
-
-.ab-inline-status.auto {
-  color: #1d4f89;
-  background: rgba(59, 130, 246, 0.14);
-  border-color: rgba(59, 130, 246, 0.34);
 }
 
 .ab-product-tests-cell {

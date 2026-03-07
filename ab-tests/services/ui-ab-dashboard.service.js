@@ -12,8 +12,6 @@ const AB_STATUS_MAP = Object.freeze({
   LOOSE: "bad",
   LOSE: "bad",
   BAD: "bad",
-  AUTO: "auto",
-  "АВТО": "auto",
   NORMAL: "neutral",
   "НОРМ": "neutral",
   "?": "unknown",
@@ -210,21 +208,6 @@ function abResolveCabinet(testNameRaw) {
   return "?";
 }
 
-function abStatusRawFromKind(kind) {
-  switch (kind) {
-    case "good":
-      return "WIN";
-    case "bad":
-      return "LOOSE";
-    case "auto":
-      return "Авто";
-    case "neutral":
-      return "NORMAL";
-    default:
-      return "?";
-  }
-}
-
 function abFiniteNumber(valueRaw) {
   const value = Number(valueRaw);
   return Number.isFinite(value) ? value : null;
@@ -266,9 +249,6 @@ function abNormalizeStatus(rawValue) {
   if (key.includes("LOOSE") || key.includes("LOSE") || key.includes("BAD") || key.includes("ПЛОХ")) {
     return "bad";
   }
-  if (key.includes("АВТО") || key.includes("AUTO")) {
-    return "auto";
-  }
   if (key.includes("NORM") || key.includes("NORMAL") || key.includes("СРЕД")) {
     return "neutral";
   }
@@ -281,8 +261,6 @@ function abStatusLabel(statusKind) {
       return "Хорошо";
     case "bad":
       return "Плохо";
-    case "auto":
-      return "Авто";
     case "neutral":
       return "Норм";
     default:
@@ -634,9 +612,6 @@ function abBuildComputedMetricsBlock(sourceRow, variants) {
   const ctrCr1DecisionRaw = abResolveCtrCr1DecisionRaw(boostCtrCr1);
   const overallDecisionRaw =
     ctrDecisionRaw === "WIN" && ctrCr1DecisionRaw === "WIN" && priceDecisionRaw === "WIN" ? "WIN" : "LOOSE";
-  const manualDecisionRaw =
-    ctrDecisionRaw === "WIN" && ctrCr1DecisionRaw === "LOOSE" && priceDecisionRaw === "WIN" ? "LOOSE" : "?";
-
   const priceDeltas = [priceDeltaDuring, priceDeltaAfter].filter((value) => Number.isFinite(value));
   const minPriceDelta = priceDeltas.length ? Math.min(...priceDeltas) : null;
   const maxPriceDelta = priceDeltas.length ? Math.max(0, ...priceDeltas) : null;
@@ -666,7 +641,6 @@ function abBuildComputedMetricsBlock(sourceRow, variants) {
     ctrDecisionRaw,
     ctrCr1DecisionRaw,
     overallDecisionRaw,
-    manualDecisionRaw,
   };
 }
 
@@ -721,8 +695,8 @@ function abBuildComputedTestCard(sourceRow, resultsByTest, catalogIndex) {
       checkName: "Подсчет CTR*CR1",
       label: "CTR*CR1 до",
       valueText: abFormatFractionToPercent(metricsBlock.ctrCr1Before, 2),
-      statusRaw: "Авто",
-      statusKind: "auto",
+      statusRaw: "",
+      statusKind: "unknown",
     },
     {
       checkName: "ИТОГ",
@@ -791,7 +765,6 @@ function abBuildComputedTestCard(sourceRow, resultsByTest, catalogIndex) {
       resultOk: metricsBlock.ctrDecisionRaw,
       testCtrCr1: metricsBlock.ctrCr1DecisionRaw,
       resultOvr: metricsBlock.overallDecisionRaw,
-      manual: metricsBlock.manualDecisionRaw,
     },
     variants,
     priceRows,
@@ -848,7 +821,6 @@ function abBuildProducts(tests) {
         tests: [],
         good: 0,
         bad: 0,
-        auto: 0,
         unknown: 0,
         latestAt: test.startedAt || test.endedAt || "",
       });
@@ -862,8 +834,6 @@ function abBuildProducts(tests) {
       item.good += 1;
     } else if (test.finalStatusKind === "bad") {
       item.bad += 1;
-    } else if (test.finalStatusKind === "auto") {
-      item.auto += 1;
     } else {
       item.unknown += 1;
     }
@@ -885,7 +855,6 @@ function abBuildProducts(tests) {
       testsCount: item.tests.length,
       good: item.good,
       bad: item.bad,
-      auto: item.auto,
       unknown: item.unknown,
       latestAt: item.latestAt,
     }))
@@ -921,7 +890,7 @@ function buildAbDashboardModel(source) {
       }
       return acc;
     },
-    { good: 0, bad: 0, auto: 0, neutral: 0, unknown: 0 },
+    { good: 0, bad: 0, neutral: 0, unknown: 0 },
   );
 
   return {
@@ -998,7 +967,6 @@ function renderAbFilterToolbar(model, filteredTests) {
           <option value="all"${abDashboardStore.filters.verdict === "all" ? " selected" : ""}>Все исходы</option>
           <option value="good"${abDashboardStore.filters.verdict === "good" ? " selected" : ""}>Хорошо</option>
           <option value="bad"${abDashboardStore.filters.verdict === "bad" ? " selected" : ""}>Плохо</option>
-          <option value="auto"${abDashboardStore.filters.verdict === "auto" ? " selected" : ""}>Авто</option>
           <option value="unknown"${abDashboardStore.filters.verdict === "unknown" ? " selected" : ""}>Нет данных</option>
         </select>
       </label>
@@ -1034,7 +1002,6 @@ function renderAbTestCard(test) {
     { label: "ИТОГ ОК", raw: test.summaryChecks.resultOk },
     { label: "Тест CTR*CR1", raw: test.summaryChecks.testCtrCr1 },
     { label: "ИТОГ ОВР", raw: test.summaryChecks.resultOvr },
-    { label: "Ручная", raw: test.summaryChecks.manual },
   ]
     .map(
       (item) => `<div class="ab-check-pill"><span>${abEscapeHtml(item.label)}</span>${abStatusPill(item.raw, true)}</div>`,
@@ -1220,7 +1187,6 @@ function renderAbProductsSection(products) {
       <td>${abEscapeHtml(abFormatInt(item.testsCount))}</td>
       <td><span class="ab-inline-status good">${abEscapeHtml(abFormatInt(item.good))}</span></td>
       <td><span class="ab-inline-status bad">${abEscapeHtml(abFormatInt(item.bad))}</span></td>
-      <td><span class="ab-inline-status auto">${abEscapeHtml(abFormatInt(item.auto))}</span></td>
       <td>${abEscapeHtml(item.latestAt || "—")}</td>
       <td class="ab-product-tests-cell">${testsList || "—"}</td>
     </tr>`;
@@ -1242,7 +1208,6 @@ function renderAbProductsSection(products) {
             <th>Тестов</th>
             <th>Хорошо</th>
             <th>Плохо</th>
-            <th>Авто</th>
             <th>Последний старт</th>
             <th>Тесты</th>
           </tr>
