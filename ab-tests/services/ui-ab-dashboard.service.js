@@ -201,13 +201,14 @@ function abFormatSourceDateTime(valueRaw) {
 function abFormatVariantDateTime(valueRaw) {
   const iso = typeof valueRaw === "string" && valueRaw.includes("T") ? valueRaw : abParseDateLiteral(valueRaw);
   if (!iso) {
-    return "";
+    return { date: "", time: "" };
   }
   const date = new Date(iso);
   const pad = (value) => String(value).padStart(2, "0");
-  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${String(date.getFullYear()).slice(-2)}\n${pad(date.getHours())}:${pad(
-    date.getMinutes(),
-  )}:${pad(date.getSeconds())}`;
+  return {
+    date: `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${String(date.getFullYear()).slice(-2)}`,
+    time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+  };
 }
 
 function abResolveCabinet(testNameRaw) {
@@ -527,12 +528,20 @@ function abResolveCtrCr1DecisionRaw(boostCtrCr1) {
   return boostCtrCr1 >= 0.1 ? "WIN" : "LOOSE";
 }
 
-function abResolvePriceDecisionRaw(priceDuringDelta, priceAfterDelta) {
-  const deltas = [priceDuringDelta, priceAfterDelta].filter((value) => Number.isFinite(value));
-  if (!deltas.length) {
+function abResolvePriceDecisionRaw(priceBeforeDelta, priceDuringDelta, priceAfterDelta) {
+  const deltas = [priceBeforeDelta, priceDuringDelta, priceAfterDelta];
+  if (deltas.some((value) => !Number.isFinite(value))) {
     return "?";
   }
-  return Math.min(...deltas) < -0.06 ? "LOOSE" : "WIN";
+  return deltas.every((value) => Math.abs(value) <= 0.06) ? "WIN" : "LOOSE";
+}
+
+function abResolveOverallDecisionRaw(decisions) {
+  const prepared = (Array.isArray(decisions) ? decisions : []).map((item) => String(item || "").trim().toUpperCase());
+  if (!prepared.length || prepared.some((item) => !item || item === "?")) {
+    return "?";
+  }
+  return prepared.every((item) => item === "WIN") ? "WIN" : "LOOSE";
 }
 
 function abBuildComputedReportLines(metrics) {
@@ -558,6 +567,7 @@ function abBuildVariantCards(resultsList, endedAtIso = "") {
     const nextInstalledMs = next?.installedAt ? new Date(next.installedAt).getTime() : NaN;
     const currentInstalledMs = item.installedAt ? new Date(item.installedAt).getTime() : NaN;
     const endMs = Number.isFinite(nextInstalledMs) ? nextInstalledMs : testEndedMs;
+    const installedAtParts = item.installedAt ? abFormatVariantDateTime(item.installedAt) : { date: "", time: "" };
     const hoursValue =
       Number.isFinite(currentInstalledMs) && Number.isFinite(endMs)
         ? (endMs - currentInstalledMs) / 3600000
@@ -573,7 +583,8 @@ function abBuildVariantCards(resultsList, endedAtIso = "") {
       views: abFormatInt(item.views),
       clicks: abFormatInt(item.clicks),
       ctr: Number.isFinite(ctrValue) ? abFormatFractionToPercent(ctrValue, 2) : "—",
-      installedAt: item.installedAt ? abFormatVariantDateTime(item.installedAt) : "—",
+      installedAtDate: installedAtParts.date || "—",
+      installedAtTime: installedAtParts.time || "",
       hours: Number.isFinite(hoursValue) && hoursValue >= 0 ? abFormatHours(hoursValue) : "—",
     };
   });
@@ -593,7 +604,8 @@ function abBuildVariantCards(resultsList, endedAtIso = "") {
       views: "—",
       clicks: "—",
       ctr: "—",
-      installedAt: "—",
+      installedAtDate: "—",
+      installedAtTime: "",
       hours: "—",
     },
   ];
@@ -622,19 +634,16 @@ function abBuildComputedMetricsBlock(sourceRow, variants) {
   const priceDuring = abToNumber(abCellRaw(sourceRow, "AV"));
   const priceAfter = abToNumber(abCellRaw(sourceRow, "AW"));
   const priceDeltaBefore = abToNumber(abCellRaw(sourceRow, "Z"));
-  const priceDeltaDuring =
-    Number.isFinite(priceBefore) && priceBefore !== 0 && Number.isFinite(priceDuring) ? priceDuring / priceBefore - 1 : abToNumber(abCellRaw(sourceRow, "AA"));
-  const priceDeltaAfter =
-    Number.isFinite(priceDuring) && priceDuring !== 0 && Number.isFinite(priceAfter) ? priceAfter / priceDuring - 1 : abToNumber(abCellRaw(sourceRow, "AB"));
+  const priceDeltaDuring = abToNumber(abCellRaw(sourceRow, "AA"));
+  const priceDeltaAfter = abToNumber(abCellRaw(sourceRow, "AB"));
 
-  const priceDecisionRaw = abResolvePriceDecisionRaw(priceDeltaDuring, priceDeltaAfter);
+  const priceDecisionRaw = abResolvePriceDecisionRaw(priceDeltaBefore, priceDeltaDuring, priceDeltaAfter);
   const ctrDecisionRaw = abResolveCtrDecisionRaw(boostCtr);
   const ctrCr1DecisionRaw = abResolveCtrCr1DecisionRaw(boostCtrCr1);
-  const overallDecisionRaw =
-    ctrDecisionRaw === "WIN" && ctrCr1DecisionRaw === "WIN" && priceDecisionRaw === "WIN" ? "WIN" : "LOOSE";
-  const priceDeltas = [priceDeltaDuring, priceDeltaAfter].filter((value) => Number.isFinite(value));
+  const overallDecisionRaw = abResolveOverallDecisionRaw([ctrDecisionRaw, priceDecisionRaw, ctrCr1DecisionRaw]);
+  const priceDeltas = [priceDeltaBefore, priceDeltaDuring, priceDeltaAfter].filter((value) => Number.isFinite(value));
   const minPriceDelta = priceDeltas.length ? Math.min(...priceDeltas) : null;
-  const maxPriceDelta = priceDeltas.length ? Math.max(0, ...priceDeltas) : null;
+  const maxPriceDelta = priceDeltas.length ? Math.max(...priceDeltas) : null;
 
   return {
     oldCtr,
@@ -789,10 +798,10 @@ function abBuildComputedTestCard(sourceRow, resultsByTest, catalogIndex) {
     finalStatusRaw: finalMetric?.statusRaw || "",
     finalStatusKind: finalMetric?.statusKind || "unknown",
     summaryChecks: {
+      testCtr: metricsBlock.ctrDecisionRaw,
       testPrice: metricsBlock.priceDecisionRaw,
-      resultOk: metricsBlock.ctrDecisionRaw,
       testCtrCr1: metricsBlock.ctrCr1DecisionRaw,
-      resultOvr: metricsBlock.overallDecisionRaw,
+      overall: metricsBlock.overallDecisionRaw,
     },
     variants,
     priceDeviationCount: abFormatInt(abToNumber(abCellRaw(sourceRow, "Y"))),
@@ -1029,13 +1038,13 @@ function renderAbTestCard(test) {
     : "<p class=\"subtle\">Без текстового отчета.</p>";
 
   const checksHtml = [
+    { label: "Тест CTR", raw: test.summaryChecks.testCtr },
     { label: "Тест изм. цены", raw: test.summaryChecks.testPrice },
-    { label: "ИТОГ ОК", raw: test.summaryChecks.resultOk },
     { label: "Тест CTR*CR1", raw: test.summaryChecks.testCtrCr1 },
-    { label: "ИТОГ ОВР", raw: test.summaryChecks.resultOvr },
+    { label: "Итог", raw: test.summaryChecks.overall },
   ]
     .map(
-      (item) => `<div class="ab-check-pill"><span>${abEscapeHtml(item.label)}</span>${abStatusPill(item.raw, true)}</div>`,
+      (item) => `<div class="ab-check-pill is-inline"><span>${abEscapeHtml(item.label)}</span>${abStatusPill(item.raw, true)}</div>`,
     )
     .join("");
 
@@ -1064,7 +1073,13 @@ function renderAbTestCard(test) {
   const viewsCells = test.variants.map((variant) => `<td>${abEscapeHtml(variant.views)}</td>`).join("");
   const clicksCells = test.variants.map((variant) => `<td>${abEscapeHtml(variant.clicks)}</td>`).join("");
   const ctrCells = test.variants.map((variant) => `<td>${abEscapeHtml(variant.ctr)}</td>`).join("");
-  const installCells = test.variants.map((variant) => `<td>${abEscapeHtml(variant.installedAt)}</td>`).join("");
+  const installCells = test.variants
+    .map(
+      (variant) => `<td><div class="ab-variant-install-time"><span>${abEscapeHtml(variant.installedAtDate)}</span><span>${abEscapeHtml(
+        variant.installedAtTime || "—",
+      )}</span></div></td>`,
+    )
+    .join("");
   const hoursCells = test.variants.map((variant) => `<td>${abEscapeHtml(variant.hours)}</td>`).join("");
 
   const priceStagesHtml = (test.priceStages || [])
@@ -1098,6 +1113,7 @@ function renderAbTestCard(test) {
       <div class="ab-test-head-main">
         <h4>Тест ${abEscapeHtml(test.testId)}</h4>
         <p class="ab-test-title" title="${abEscapeAttr(test.title)}">${abEscapeHtml(test.title || "—")}</p>
+        <div class="ab-test-summary-row">${checksHtml}</div>
         <div class="ab-test-meta-row">
           <span class="ab-test-chip">Артикул: <strong>${abEscapeHtml(test.article || "—")}</strong></span>
           <span class="ab-test-chip">Тип РК: <strong>${abEscapeHtml(test.type || "—")}</strong></span>
@@ -1109,13 +1125,11 @@ function renderAbTestCard(test) {
       <div class="ab-test-head-actions">
         ${abSafeLink(test.xwayUrl, "XWay")}
         ${abSafeLink(test.wbUrl, "WB")}
-        ${abStatusPill(test.finalStatusRaw)}
       </div>
     </header>
 
     <div class="ab-test-layout">
       <section class="ab-test-left">
-        <div class="ab-checks-grid">${checksHtml}</div>
         <div class="ab-metrics-card">
           <h5>Сводка метрик</h5>
           <table class="ab-mini-table">

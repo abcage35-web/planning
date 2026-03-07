@@ -495,6 +495,12 @@ body {
   font: 600 14px/1.35 "IBM Plex Sans", sans-serif;
 }
 
+.ab-test-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .ab-test-meta-row {
   display: flex;
   flex-wrap: wrap;
@@ -574,6 +580,12 @@ body {
   align-content: start;
 }
 
+.ab-test-right {
+  height: 100%;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  align-content: stretch;
+}
+
 .ab-checks-grid {
   display: grid;
   gap: 6px;
@@ -593,6 +605,16 @@ body {
   font: 700 12px/1.1 "IBM Plex Sans", sans-serif;
 }
 
+.ab-check-pill.is-inline {
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 3px 6px 3px 10px;
+  justify-content: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  background: rgba(240, 247, 251, 0.92);
+}
+
 .ab-metrics-card,
 .ab-report-card,
 .ab-side-card {
@@ -600,6 +622,12 @@ body {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.88);
   padding: 8px;
+}
+
+.ab-side-card {
+  height: 100%;
+  display: grid;
+  align-content: start;
 }
 
 .ab-metrics-card h5,
@@ -769,6 +797,15 @@ body {
   background: rgba(245, 250, 253, 0.9);
 }
 
+.ab-variant-install-time {
+  display: grid;
+  gap: 2px;
+}
+
+.ab-variant-install-time span {
+  display: block;
+}
+
 .ab-cover-link {
   display: inline-flex;
   width: min(100%, 100px);
@@ -931,6 +968,11 @@ body {
 
   .ab-test-layout {
     grid-template-columns: 1fr;
+  }
+
+  .ab-test-right {
+    height: auto;
+    grid-template-rows: none;
   }
 }
 
