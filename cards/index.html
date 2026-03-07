@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WB Dashboard: Заполненность Карточек</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./app.css" />
+    <script src="./services/wb-market.service.js" defer></script>
+    <script src="./services/ui-tooltips.service.js" defer></script>
+    <script src="./services/ui-controls-filters.service.js" defer></script>
+    <script src="./services/parser-utils.service.js" defer></script>
+    <script src="./services/wb-card-loader.service.js" defer></script>
+    <script src="./services/app-controls.service.js" defer></script>
+    <script src="./services/ui-table.service.js" defer></script>
+    <script src="./services/ui-problems.service.js" defer></script>
+    <script src="./services/ui-dashboard.service.js" defer></script>
+    <script src="./services/ui-overlays.service.js" defer></script>
+    <script src="./services/cloud-state.service.js" defer></script>
+    <script src="./services/app-runtime-utils.service.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="ambient ambient-a"></div>
+    <div class="ambient ambient-b"></div>
+
+    <main class="app-shell">
+      <div id="mainView" class="view-screen">
+        <div id="startupLoading" class="startup-loading" aria-live="polite" aria-busy="true">
+          <div class="startup-loading-card">
+            <span class="startup-loading-spinner" aria-hidden="true"></span>
+            <span id="startupLoadingText" class="startup-loading-text">Загружаю данные…</span>
+          </div>
+        </div>
+
+        <section class="panel page-switch-panel reveal">
+          <div class="page-switch-row" aria-label="Навигация проектов">
+            <span class="page-switch-btn is-active">Карточки</span>
+            <a class="page-switch-btn" href="../ab-tests/">AB‑тесты</a>
+          </div>
+        </section>
+
+        <div id="cardsPage" class="view-page is-active">
+        <section id="globalFiltersFrame" class="panel global-filters-frame reveal">
+          <div class="global-filters-head">
+            <div class="global-filters-head-main">
+              <div id="globalFiltersSummary" class="global-filters-summary"></div>
+            </div>
+            <div class="global-filters-head-actions">
+              <label class="global-head-article-filter" aria-label="Быстрый поиск по артикулу, названию и вендор-коду">
+                <input
+                  id="globalNmIdQuickInput"
+                  data-filter-key="quickSearch"
+                  class="filter-input"
+                  type="text"
+                  placeholder="Поиск: артикул, название, вендор"
+                  autocomplete="off"
+                />
+              </label>
+              <button id="globalFiltersToggleBtn" class="btn btn-mini btn-has-icon" type="button">Фильтры</button>
+              <button id="resetAllFiltersBtn" class="btn btn-mini btn-has-icon" type="button">Сбросить</button>
+              <div id="authStatus" class="auth-status" hidden>
+                <span id="authRoleBadge" class="auth-role-badge"></span>
+                <span id="authUserLabel" class="auth-user-label"></span>
+                <button
+                  id="logoutBtn"
+                  class="btn btn-mini btn-has-icon auth-logout-btn"
+                  type="button"
+                  aria-label="Выйти"
+                  title="Выйти"
+                ></button>
+              </div>
+            </div>
+          </div>
+
+          <div id="globalFiltersBody" class="global-filters-body">
+            <div class="global-filter-group global-filter-group-mode">
+              <div class="global-count-mode-box">
+                <div class="global-count-mode" role="group" aria-label="Режим счётчиков фильтров">
+                  <span class="global-count-mode-caption">Счётчики:</span>
+                  <span id="filterCountModeErrorsLabel" class="global-count-mode-label">Ошибки</span>
+                  <label class="global-count-mode-switch" aria-label="Переключатель режима счётчиков">
+                    <input id="filterCountModeToggle" type="checkbox" />
+                    <span class="global-count-mode-slider" aria-hidden="true"></span>
+                  </label>
+                  <span id="filterCountModeRowsLabel" class="global-count-mode-label">Артикулы</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="global-filter-group global-filter-group-cabinets">
+              <p class="global-filter-group-title">Кабинеты</p>
+              <div id="globalCabinetFilters" class="global-chip-row"></div>
+
+              <div class="global-filter-subgroup">
+                <p class="global-filter-group-title">Предустановленные фильтры</p>
+                <div id="presetFilters" class="preset-filters"></div>
+              </div>
+            </div>
+
+            <div class="global-filter-group global-filter-group-categories">
+              <p class="global-filter-group-title">Категории товаров</p>
+              <label class="global-filter-field global-category-search">
+                <input
+                  id="globalCategorySearchInput"
+                  class="filter-input"
+                  type="text"
+                  placeholder="Найти кнопку категории..."
+                  autocomplete="off"
+                />
+              </label>
+              <div id="globalCategoryFilters" class="global-chip-row"></div>
+            </div>
+
+            <div class="global-filter-group global-filter-group-columns">
+              <p class="global-filter-group-title">Фильтры колонок</p>
+              <div id="filtersRow" class="global-columns-filters">
+                <label class="global-filter-field">
+                  <input id="filterNmId" data-filter-key="nmId" class="filter-input" type="text" placeholder="Артикул" />
+                </label>
+                <label class="global-filter-field">
+                  <input data-filter-key="cardCode" class="filter-input" type="text" placeholder="Вендор-код" />
+                </label>
+                <label class="global-filter-field">
+                  <input
+                    data-filter-key="stockFrom"
+                    class="filter-input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputmode="numeric"
+                    placeholder="Ост. от"
+                  />
+                </label>
+                <label class="global-filter-field">
+                  <input
+                    data-filter-key="stockTo"
+                    class="filter-input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputmode="numeric"
+                    placeholder="Ост. до"
+                  />
+                </label>
+                <label class="global-filter-field">
+                  <select id="filterCabinet" data-filter-key="cabinet" class="filter-select">
+                    <option value="all">Кабинет</option>
+                  </select>
+                </label>
+                <label class="global-filter-field">
+                  <input data-filter-key="name" class="filter-input" type="text" placeholder="Название товара" />
+                </label>
+                <label class="global-filter-field">
+                  <input data-filter-key="category" class="filter-input" type="text" placeholder="Категория (текст)" />
+                </label>
+                <label class="global-filter-field">
+                  <select data-filter-key="video" class="filter-select">
+                    <option value="all">Видео</option>
+                    <option value="yes">Да</option>
+                    <option value="no">Нет</option>
+                  </select>
+                </label>
+                <label class="global-filter-field">
+                  <select data-filter-key="recommendations" class="filter-select">
+                    <option value="all">Рекомендации</option>
+                    <option value="yes">Да</option>
+                    <option value="no">Нет</option>
+                  </select>
+                </label>
+                <label class="global-filter-field">
+                  <select data-filter-key="rich" class="filter-select">
+                    <option value="all">Рич</option>
+                    <option value="yes">Да</option>
+                    <option value="no">Нет</option>
+                    <option value="na">Н/Д</option>
+                  </select>
+                </label>
+                <label class="global-filter-field">
+                  <select data-filter-key="autoplay" class="filter-select">
+                    <option value="all">Автоплей</option>
+                    <option value="yes">Да</option>
+                    <option value="no">Нет</option>
+                  </select>
+                </label>
+                <label class="global-filter-field">
+                  <select data-filter-key="tags" class="filter-select">
+                    <option value="all">Тэги</option>
+                    <option value="yes">Да</option>
+                    <option value="no">Нет</option>
+                  </select>
+                </label>
+                <label class="global-filter-field">
+                  <select data-filter-key="coverDuplicate" class="filter-select">
+                    <option value="all">Дубль обложки</option>
+                    <option value="yes">Да</option>
+                    <option value="no">Нет</option>
+                    <option value="na">Н/Д</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel agreement-inline reveal">
+          <div id="agreementDashboardMain" class="agreement-dashboard"></div>
+        </section>
+
+        <section id="controlsPanel" class="panel controls reveal delay-1">
+          <div class="controls-head">
+            <div>
+              <p class="eyebrow">Управление</p>
+              <p class="subtle controls-subtle">
+                Кабинет определяется автоматически по настройкам продавцов.
+              </p>
+            </div>
+            <div class="btn-row btn-row-top">
+              <button id="loadAllBtn" class="btn btn-primary btn-has-icon" type="button">Обновить</button>
+              <button id="downloadExportBtn" class="btn btn-mini btn-has-icon" type="button">Скачать .xlsx</button>
+              <button id="errorDetailsBtn" class="btn btn-mini" type="button" hidden>Показать ошибки</button>
+              <button id="toggleControlsBtn" class="btn btn-has-icon" type="button">Свернуть</button>
+            </div>
+          </div>
+
+          <div id="controlsBody" class="controls-body">
+            <label class="field">
+              <span>Массив артикулов WB или ссылок (по одному значению в строке)</span>
+              <textarea
+                id="bulkInput"
+                rows="5"
+                placeholder="261023143&#10;https://www.wildberries.ru/catalog/162146778/detail.aspx"
+              ></textarea>
+            </label>
+
+            <div class="toolbar">
+              <div class="btn-row">
+                <button id="addBulkBtn" class="btn" type="button">Добавить список</button>
+                <button id="clearBtn" class="btn btn-danger" type="button">Очистить</button>
+              </div>
+              <p class="hint">
+                Источник данных: публичные ресурсы WB. WB может ограничивать доступ (429/x-pow),
+                это зависит от сети/браузера.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel table-panel reveal delay-2">
+          <div class="table-tools">
+            <div class="table-tools-left">
+              <label class="rows-limit-control" for="rowsLimitSelect">
+                <span>Лимит строк</span>
+                <select id="rowsLimitSelect" class="rows-limit-select">
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="150">150</option>
+                  <option value="200">200</option>
+                  <option value="250">250</option>
+                  <option value="300">300</option>
+                </select>
+              </label>
+
+              <label class="table-sort-control" for="tableSortMetricSelect">
+                <span>Сортировка</span>
+                <select id="tableSortMetricSelect" class="rows-limit-select">
+                  <option value="default">По умолчанию</option>
+                  <option value="nmid">Артикул</option>
+                  <option value="stock">Остаток</option>
+                  <option value="price">Цена</option>
+                  <option value="rating">Рейтинг</option>
+                  <option value="reviews">Отзывы</option>
+                  <option value="slides">Слайды</option>
+                  <option value="problems">Проблемы</option>
+                  <option value="updated">Обновлено</option>
+                </select>
+                <select id="tableSortDirectionSelect" class="rows-limit-select">
+                  <option value="asc">По возрастанию</option>
+                  <option value="desc">По убыванию</option>
+                </select>
+              </label>
+            </div>
+            <div class="table-pagination">
+              <button id="pagePrevBtn" class="page-btn" type="button" aria-label="Предыдущая страница" data-hint="Предыдущая страница"></button>
+              <span id="pageInfo" class="page-info">Страница 1 / 1</span>
+              <button id="pageNextBtn" class="page-btn" type="button" aria-label="Следующая страница" data-hint="Следующая страница"></button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <colgroup>
+                <col class="col-actions" />
+                <col class="col-number" />
+                <col class="col-nmid" />
+                <col class="col-cabinet" />
+                <col class="col-name" />
+                <col class="col-product-info" />
+                <col class="col-checks" />
+                <col class="col-listing" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th class="actions-col"></th>
+                  <th>№</th>
+                  <th>Артикул</th>
+                  <th>Кабинет</th>
+                  <th>Товар</th>
+                  <th>Товарная информация</th>
+                  <th class="checks-col">Проверки карточки</th>
+                  <th class="listing-col">Листинг</th>
+                </tr>
+              </thead>
+              <tbody id="rowsBody"></tbody>
+            </table>
+          </div>
+        </section>
+        </div>
+
+      </div>
+    </main>
+
+    <div id="authGate" class="auth-gate" hidden>
+      <div class="auth-card panel">
+        <h2>Вход в систему</h2>
+        <form id="authForm" class="auth-form" autocomplete="off">
+          <label class="field auth-field">
+            <span>Логин</span>
+            <input id="authLoginInput" class="filter-input" type="text" autocomplete="username" required />
+          </label>
+          <label class="field auth-field">
+            <span>Пароль</span>
+            <div class="auth-password-wrap">
+              <input id="authPasswordInput" class="filter-input" type="password" autocomplete="current-password" required />
+              <button
+                id="authPasswordToggleBtn"
+                class="auth-password-toggle"
+                type="button"
+                aria-label="Показать пароль"
+                title="Показать пароль"
+                aria-pressed="false"
+              ></button>
+            </div>
+          </label>
+          <button id="authSubmitBtn" class="btn btn-primary" type="submit">Войти</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="bulkProgressToast" class="bulk-progress-toast" hidden>
+      <div class="bulk-progress-card">
+        <div id="bulkProgressRing" class="bulk-progress-ring" style="--bulk-progress: 0%">
+          <span id="bulkProgressPercent" class="bulk-progress-percent">0%</span>
+        </div>
+        <div class="bulk-progress-copy">
+          <p id="bulkProgressTitle" class="bulk-progress-title">Обновляю карточки…</p>
+          <p id="bulkProgressMeta" class="bulk-progress-meta">0/0 · расчёт времени…</p>
+        </div>
+        <button id="bulkCancelBtn" class="bulk-progress-cancel" type="button">Прервать</button>
+      </div>
+    </div>
+
+    <div id="previewModal" class="preview-modal" hidden>
+      <div class="preview-backdrop" data-preview-close="1"></div>
+      <div class="preview-card">
+        <div class="preview-top">
+          <p id="previewCaption"></p>
+          <div class="preview-top-actions">
+            <button id="previewRefreshBtn" class="preview-refresh" type="button">Обновить</button>
+            <button id="previewCloseBtn" class="preview-close" type="button">Закрыть</button>
+          </div>
+        </div>
+        <div class="preview-stage">
+          <button id="previewPrevBtn" class="preview-nav preview-nav-prev" type="button" aria-label="Предыдущий слайд" data-hint="Предыдущий слайд"></button>
+          <img id="previewImage" src="" alt="Слайд WB" />
+          <button id="previewNextBtn" class="preview-nav preview-nav-next" type="button" aria-label="Следующий слайд" data-hint="Следующий слайд"></button>
+        </div>
+        <div id="previewThumbs" class="preview-thumbs"></div>
+      </div>
+    </div>
+
+    <div id="recommendationsModal" class="recommendations-modal" hidden>
+      <div class="preview-backdrop" data-rec-close="1"></div>
+      <div class="recommendations-card">
+        <div class="modal-head">
+          <h3 id="recommendationsTitle">Рекомендации продавца</h3>
+          <div class="modal-head-actions">
+            <button id="recommendationsRefreshBtn" class="preview-refresh" type="button">Обновить</button>
+            <button id="recommendationsCloseBtn" class="preview-close" type="button">Закрыть</button>
+          </div>
+        </div>
+        <p id="recommendationsSubtle" class="subtle overlay-note"></p>
+        <div id="recommendationsContent" class="recommendations-content"></div>
+      </div>
+    </div>
+
+    <div id="richModal" class="recommendations-modal rich-modal" hidden>
+      <div class="preview-backdrop" data-rich-close="1"></div>
+      <div class="recommendations-card rich-card">
+        <div class="preview-top rich-top">
+          <p id="richCaption">Рич-контент</p>
+          <div class="preview-top-actions">
+            <button id="richRefreshBtn" class="preview-refresh" type="button">Обновить</button>
+            <button id="richCloseBtn" class="preview-close" type="button">Закрыть</button>
+          </div>
+        </div>
+        <div id="richContent" class="recommendations-content rich-content"></div>
+      </div>
+    </div>
+
+    <div id="limitsModal" class="recommendations-modal limits-modal" hidden>
+      <div class="preview-backdrop" data-limits-close="1"></div>
+      <div class="recommendations-card limits-card">
+        <div class="modal-head">
+          <h3>Настройки лимитов кабинетов</h3>
+          <div class="modal-head-actions">
+            <button id="limitsCloseBtn" class="preview-close" type="button">Закрыть</button>
+          </div>
+        </div>
+        <p class="subtle overlay-note">Изменяйте общий лимит и индивидуальные лимиты по каждому кабинету.</p>
+        <div id="limitsContent" class="limits-content"></div>
+      </div>
+    </div>
+
+    <div id="sellersModal" class="recommendations-modal sellers-modal" hidden>
+      <div class="preview-backdrop" data-sellers-close="1"></div>
+      <div class="recommendations-card sellers-card">
+        <div class="modal-head">
+          <h3>Кабинеты продавцов</h3>
+          <div class="modal-head-actions">
+            <button id="sellersCloseBtn" class="preview-close" type="button">Закрыть</button>
+          </div>
+        </div>
+        <p class="subtle overlay-note">Добавляйте кабинеты вручную: название и ссылка на продавца WB.</p>
+        <div id="sellersContent" class="sellers-content"></div>
+      </div>
+    </div>
+
+    <div id="rowHistoryModal" class="recommendations-modal row-history-modal" hidden>
+      <div class="preview-backdrop" data-row-history-close="1"></div>
+      <div class="recommendations-card row-history-card">
+        <div class="modal-head">
+          <h3 id="rowHistoryTitle">История обновлений</h3>
+          <div class="modal-head-actions">
+            <button
+              id="rowHistoryChangesFilterBtn"
+              class="preview-refresh row-history-filter-toggle"
+              type="button"
+              aria-pressed="false"
+            >
+              Только изменения
+            </button>
+            <button id="rowHistoryCloseBtn" class="preview-close" type="button">Закрыть</button>
+          </div>
+        </div>
+        <p id="rowHistorySubtle" class="subtle overlay-note">Храним историю изменений по этой строке.</p>
+        <div id="rowHistoryContent" class="row-history-content"></div>
+      </div>
+    </div>
+
+    <div id="problemsChartModal" class="recommendations-modal problems-chart-modal" hidden>
+      <div class="preview-backdrop" data-problems-chart-close="1"></div>
+      <div class="recommendations-card problems-chart-card">
+        <div class="modal-head">
+          <h3>Динамика проблем</h3>
+          <div class="modal-head-actions">
+            <button id="problemsChartCloseBtn" class="preview-close" type="button">Закрыть</button>
+          </div>
+        </div>
+        <p class="subtle overlay-note">
+          График не зависит от глобальных фильтров таблицы. Фильтр ниже влияет только на этот график.
+        </p>
+        <div class="problems-chart-controls">
+          <label class="field problems-chart-cabinet-field">
+            <span>Кабинет</span>
+            <select id="problemsChartCabinetFilter" class="filter-select"></select>
+          </label>
+        </div>
+        <div id="problemsChartContent" class="problems-chart-content"></div>
+      </div>
+    </div>
+  </body>
+</html>

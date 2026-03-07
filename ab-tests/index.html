@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WB Dashboard: AB‑тесты</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./app.css" />
+    <script src="./services/ui-ab-dashboard.service.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="ambient ambient-a"></div>
+    <div class="ambient ambient-b"></div>
+
+    <main class="ab-shell">
+      <section class="panel project-nav-panel">
+        <div class="project-nav-row">
+          <a class="project-nav-btn" href="../cards/">Карточки</a>
+          <span class="project-nav-btn is-active">AB‑тесты</span>
+        </div>
+      </section>
+
+      <section class="panel ab-tests-panel reveal">
+        <div class="ab-tests-head">
+          <div class="ab-tests-head-main">
+            <p class="eyebrow">AB‑тесты</p>
+            <h1>Дашборд AB‑тестов обложек</h1>
+            <p id="abTestsMetaLine" class="subtle">
+              Источник формул: [WB] Сводка : тесты CTR. Медиа: (*) Результаты по обложкам XWAY.
+            </p>
+          </div>
+          <div class="ab-tests-head-actions">
+            <button id="abTestsRefreshBtn" class="btn btn-primary btn-has-icon" type="button">Обновить данные</button>
+          </div>
+        </div>
+
+        <div id="abTestsContent" class="ab-tests-content">
+          <div class="ab-tests-state-card">
+            <span class="ab-tests-state-spinner" aria-hidden="true"></span>
+            <span>Подготовка дашборда AB‑тестов…</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
