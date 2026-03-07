@@ -80,6 +80,21 @@ function abParseDateLiteral(valueRaw) {
 
   const match = value.match(/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/);
   if (!match) {
+    const dottedMatch = value.match(
+      /^(\d{2})\.(\d{2})\.(\d{2}|\d{4})(?:[,\s]+(\d{2}):(\d{2})(?::(\d{2}))?)?$/,
+    );
+    if (dottedMatch) {
+      const day = Number(dottedMatch[1]);
+      const month = Number(dottedMatch[2]) - 1;
+      const yearText = dottedMatch[3];
+      const year = yearText.length === 2 ? 2000 + Number(yearText) : Number(yearText);
+      const hours = Number(dottedMatch[4] || 0);
+      const minutes = Number(dottedMatch[5] || 0);
+      const seconds = Number(dottedMatch[6] || 0);
+      const dottedDate = new Date(year, month, day, hours, minutes, seconds);
+      return Number.isNaN(dottedDate.getTime()) ? null : dottedDate.toISOString();
+    }
+
     const direct = new Date(value);
     return Number.isNaN(direct.getTime()) ? null : direct.toISOString();
   }
@@ -194,7 +209,6 @@ function abFormatSourceDateTime(valueRaw) {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
   }).format(new Date(iso));
 }
 
