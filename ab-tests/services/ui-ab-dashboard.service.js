@@ -990,6 +990,108 @@ function abGetTestFilterDate(test) {
   return `${year}-${month}-${day}`;
 }
 
+function abIsGoodStatus(rawValue) {
+  return abNormalizeStatus(rawValue) === "good";
+}
+
+function abBuildCabinetFunnelCards(tests, cabinetOrder = []) {
+  const list = Array.isArray(tests) ? tests : [];
+  const cabinets = Array.isArray(cabinetOrder) && cabinetOrder.length
+    ? cabinetOrder
+    : Array.from(new Set(list.map((item) => item?.cabinet).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ru"));
+
+  return cabinets
+    .map((cabinet) => {
+      const cabinetTests = list.filter((item) => item?.cabinet === cabinet);
+      const total = cabinetTests.length;
+      if (!total) {
+        return null;
+      }
+
+      const ctrPassed = cabinetTests.filter((item) => abIsGoodStatus(item?.summaryChecks?.testCtr)).length;
+      const pricePassed = cabinetTests.filter(
+        (item) => abIsGoodStatus(item?.summaryChecks?.testCtr) && abIsGoodStatus(item?.summaryChecks?.testPrice),
+      ).length;
+      const ctrCr1Passed = cabinetTests.filter(
+        (item) =>
+          abIsGoodStatus(item?.summaryChecks?.testCtr) &&
+          abIsGoodStatus(item?.summaryChecks?.testPrice) &&
+          abIsGoodStatus(item?.summaryChecks?.testCtrCr1),
+      ).length;
+      const overallPassed = cabinetTests.filter((item) => abIsGoodStatus(item?.summaryChecks?.overall)).length;
+
+      return {
+        cabinet,
+        total,
+        stages: [
+          { key: "ctr", label: "CTR", count: ctrPassed },
+          { key: "price", label: "CTR + Цена", count: pricePassed },
+          { key: "ctrcr1", label: "CTR + Цена + CTR*CR1", count: ctrCr1Passed },
+          { key: "overall", label: "Итог", count: overallPassed },
+        ],
+      };
+    })
+    .filter(Boolean);
+}
+
+function renderAbCabinetFunnelDashboard(filteredTests) {
+  const tests = Array.isArray(filteredTests) ? filteredTests : [];
+  if (!tests.length) {
+    return "";
+  }
+
+  const funnelCards = abBuildCabinetFunnelCards(tests);
+  if (!funnelCards.length) {
+    return "";
+  }
+
+  const cardsHtml = funnelCards
+    .map((card) => {
+      const stepsHtml = card.stages
+        .map((stage, index) => {
+          const percent = card.total > 0 ? (stage.count / card.total) * 100 : 0;
+          return `<div class="ab-funnel-step" data-stage="${abEscapeAttr(stage.key)}">
+            <div class="ab-funnel-step-head">
+              <span class="ab-funnel-step-label">${abEscapeHtml(stage.label)}</span>
+              <span class="ab-funnel-step-value">${abEscapeHtml(abFormatInt(stage.count))} / ${abEscapeHtml(abFormatInt(card.total))}</span>
+            </div>
+            <div class="ab-funnel-bar" aria-hidden="true">
+              <div class="ab-funnel-bar-fill is-stage-${index + 1}" style="width:${percent.toFixed(2)}%"></div>
+            </div>
+          </div>`;
+        })
+        .join("");
+
+      const finalCount = card.stages[card.stages.length - 1]?.count || 0;
+      const finalPercent = card.total > 0 ? Math.round((finalCount / card.total) * 100) : 0;
+
+      return `<article class="ab-funnel-card">
+        <div class="ab-funnel-card-head">
+          <div>
+            <h4>${abEscapeHtml(card.cabinet)}</h4>
+            <div class="ab-funnel-card-subtle">Успешных итоговых: ${abEscapeHtml(abFormatInt(finalCount))} из ${abEscapeHtml(
+              abFormatInt(card.total),
+            )}</div>
+          </div>
+          <span class="ab-status-pill is-good">${abEscapeHtml(String(finalPercent))}%</span>
+        </div>
+        <div class="ab-funnel-steps">${stepsHtml}</div>
+      </article>`;
+    })
+    .join("");
+
+  return `<section class="ab-funnel-dashboard">
+    <div class="ab-funnel-dashboard-head">
+      <div>
+        <h3>Воронка удачных AB‑тестов по кабинетам</h3>
+        <p class="subtle">Текущая выборка по выбранным фильтрам. Этапы идут последовательно до итогового успешного теста.</p>
+      </div>
+      <span class="ab-stat-chip">Кабинетов: <strong>${abEscapeHtml(abFormatInt(funnelCards.length))}</strong></span>
+    </div>
+    <div class="ab-funnel-grid">${cardsHtml}</div>
+  </section>`;
+}
+
 function renderAbFilterToolbar(model, filteredTests) {
   const cabinets = Array.isArray(model?.cabinets) ? model.cabinets : [];
   const cabinetOptions = [`<option value="all">Все кабинеты</option>`]
@@ -1005,6 +1107,8 @@ function renderAbFilterToolbar(model, filteredTests) {
 
   const totalTests = Array.isArray(model?.tests) ? model.tests.length : 0;
   const visibleTests = Array.isArray(filteredTests) ? filteredTests.length : 0;
+  const filteredGood = filteredTests.filter((test) => test?.finalStatusKind === "good").length;
+  const filteredBad = filteredTests.filter((test) => test?.finalStatusKind === "bad").length;
 
   return `<section class="ab-toolbar-card">
     <div class="ab-toolbar-main">
@@ -1045,8 +1149,8 @@ function renderAbFilterToolbar(model, filteredTests) {
     </div>
     <div class="ab-toolbar-stats">
       <span class="ab-stat-chip">Тестов: <strong>${abEscapeHtml(abFormatInt(visibleTests))}</strong> / ${abEscapeHtml(abFormatInt(totalTests))}</span>
-      <span class="ab-stat-chip">Хорошо: <strong>${abEscapeHtml(abFormatInt(model?.statusTotals?.good || 0))}</strong></span>
-      <span class="ab-stat-chip">Плохо: <strong>${abEscapeHtml(abFormatInt(model?.statusTotals?.bad || 0))}</strong></span>
+      <span class="ab-stat-chip">Хорошо: <strong>${abEscapeHtml(abFormatInt(filteredGood))}</strong></span>
+      <span class="ab-stat-chip">Плохо: <strong>${abEscapeHtml(abFormatInt(filteredBad))}</strong></span>
     </div>
   </section>`;
 }
@@ -1389,6 +1493,7 @@ function renderAbDashboardContent() {
   contentEl.innerHTML = `
     ${renderAbFilterToolbar(model, filteredTests)}
     <div class="ab-source-line">${abEscapeHtml(sourceRowsLabel)}</div>
+    ${renderAbCabinetFunnelDashboard(filteredTests)}
     ${showTests ? renderAbTestsSection(filteredTests) : ""}
     ${showProducts ? renderAbProductsSection(filteredProducts) : ""}
   `;

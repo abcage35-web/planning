@@ -247,6 +247,125 @@ body {
   font: 600 13px/1.3 "IBM Plex Sans", sans-serif;
 }
 
+.ab-funnel-dashboard {
+  border: 1px solid rgba(22, 56, 71, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.ab-funnel-dashboard-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ab-funnel-dashboard-head h3 {
+  margin: 0 0 4px;
+  color: #203945;
+  font: 700 18px/1.15 "IBM Plex Sans", sans-serif;
+}
+
+.ab-funnel-dashboard-head .subtle {
+  margin: 0;
+  max-width: 780px;
+}
+
+.ab-funnel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.ab-funnel-card {
+  border: 1px solid rgba(22, 56, 71, 0.15);
+  border-radius: 12px;
+  background: rgba(241, 248, 251, 0.76);
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.ab-funnel-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ab-funnel-card-head h4 {
+  margin: 0;
+  color: #1f3b49;
+  font: 700 18px/1.1 "IBM Plex Sans", sans-serif;
+}
+
+.ab-funnel-card-subtle {
+  margin-top: 4px;
+  color: #58707d;
+  font: 600 12px/1.3 "IBM Plex Sans", sans-serif;
+}
+
+.ab-funnel-steps {
+  display: grid;
+  gap: 8px;
+}
+
+.ab-funnel-step {
+  display: grid;
+  gap: 5px;
+}
+
+.ab-funnel-step-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ab-funnel-step-label {
+  color: #375462;
+  font: 700 12px/1.2 "IBM Plex Sans", sans-serif;
+}
+
+.ab-funnel-step-value {
+  color: #203846;
+  font: 700 12px/1.2 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+.ab-funnel-bar {
+  position: relative;
+  width: 100%;
+  height: 9px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(154, 175, 186, 0.24);
+}
+
+.ab-funnel-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.22s ease;
+}
+
+.ab-funnel-bar-fill.is-stage-1 {
+  background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+}
+
+.ab-funnel-bar-fill.is-stage-2 {
+  background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
+}
+
+.ab-funnel-bar-fill.is-stage-3 {
+  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
+}
+
+.ab-funnel-bar-fill.is-stage-4 {
+  background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+}
+
 .ab-table-empty-row {
   color: #607682;
   text-align: center;
@@ -1144,6 +1263,11 @@ body {
 
   .ab-toolbar-main {
     grid-template-columns: 1fr;
+  }
+
+  .ab-funnel-dashboard-head {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .ab-view-switch {
