@@ -550,13 +550,17 @@ function abBuildComputedReportLines(metrics) {
   return lines.filter((line) => line.trim() || line === " ");
 }
 
-function abBuildVariantCards(resultsList) {
+function abBuildVariantCards(resultsList, endedAtIso = "") {
+  const testEndedMs = endedAtIso ? new Date(endedAtIso).getTime() : NaN;
   const prepared = (Array.isArray(resultsList) ? resultsList : []).map((item, index, list) => {
     const ctrValue = Number.isFinite(item.views) && item.views > 0 ? item.clicks / item.views : item.ctr;
     const next = list[index + 1] || null;
+    const nextInstalledMs = next?.installedAt ? new Date(next.installedAt).getTime() : NaN;
+    const currentInstalledMs = item.installedAt ? new Date(item.installedAt).getTime() : NaN;
+    const endMs = Number.isFinite(nextInstalledMs) ? nextInstalledMs : testEndedMs;
     const hoursValue =
-      item.installedAt && next?.installedAt
-        ? (new Date(next.installedAt).getTime() - new Date(item.installedAt).getTime()) / 3600000
+      Number.isFinite(currentInstalledMs) && Number.isFinite(endMs)
+        ? (endMs - currentInstalledMs) / 3600000
         : null;
 
     return {
@@ -675,7 +679,7 @@ function abBuildComputedTestCard(sourceRow, resultsByTest, catalogIndex) {
   const startedAtIso = abParseDateLiteral(abCellRaw(sourceRow, "M"));
   const endedAtIso = abParseDateLiteral(abCellRaw(sourceRow, "O"));
 
-  const variants = abBuildVariantCards(resultsByTest.get(testId));
+  const variants = abBuildVariantCards(resultsByTest.get(testId), endedAtIso);
   const metricsBlock = abBuildComputedMetricsBlock(sourceRow, variants);
 
   const metrics = [
