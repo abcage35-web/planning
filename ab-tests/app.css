@@ -780,6 +780,18 @@ body {
   font: 700 10px/1.15 "IBM Plex Sans", sans-serif;
 }
 
+.ab-variant-matrix thead th.is-best {
+  color: #0c6a58;
+  background: rgba(222, 247, 239, 0.95);
+}
+
+.ab-variant-best-header {
+  display: block;
+  margin-top: 4px;
+  color: #0f7a63;
+  font: 700 9px/1 "IBM Plex Sans", sans-serif;
+}
+
 .ab-variant-matrix tr:last-child td,
 .ab-variant-matrix tr:last-child th {
   border-bottom: 0;
@@ -806,6 +818,15 @@ body {
   display: block;
 }
 
+.ab-cover-frame {
+  position: relative;
+  display: inline-flex;
+}
+
+.ab-cover-frame.is-best {
+  filter: drop-shadow(0 8px 18px rgba(16, 185, 129, 0.16));
+}
+
 .ab-cover-link {
   display: inline-flex;
   width: min(100%, 100px);
@@ -815,11 +836,32 @@ body {
   background: rgba(245, 248, 251, 0.95);
 }
 
+.ab-cover-link.is-best {
+  border-color: rgba(16, 185, 129, 0.56);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.18);
+}
+
 .ab-cover-link img {
   width: 100%;
   aspect-ratio: 3 / 4;
   object-fit: cover;
   display: block;
+}
+
+.ab-variant-best-badge {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.92);
+  color: #ffffff;
+  font: 700 9px/1 "IBM Plex Sans", sans-serif;
+  letter-spacing: 0.02em;
 }
 
 .ab-image-placeholder {

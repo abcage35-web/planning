@@ -590,7 +590,14 @@ function abBuildVariantCards(resultsList, endedAtIso = "") {
   });
 
   if (prepared.length) {
-    return prepared;
+    const bestCtr = prepared.reduce((max, item) => {
+      return Number.isFinite(item.ctrValue) && item.ctrValue > max ? item.ctrValue : max;
+    }, Number.NEGATIVE_INFINITY);
+    const tolerance = 1e-9;
+    return prepared.map((item) => ({
+      ...item,
+      isBest: Number.isFinite(bestCtr) && Number.isFinite(item.ctrValue) ? Math.abs(item.ctrValue - bestCtr) <= tolerance : false,
+    }));
   }
 
   return [
@@ -607,6 +614,7 @@ function abBuildVariantCards(resultsList, endedAtIso = "") {
       installedAtDate: "—",
       installedAtTime: "",
       hours: "—",
+      isBest: false,
     },
   ];
 }
@@ -779,7 +787,6 @@ function abBuildComputedTestCard(sourceRow, resultsByTest, catalogIndex) {
   ];
 
   const reportLines = abBuildComputedReportLines(metricsBlock);
-  const finalMetric = metrics[metrics.length - 1];
 
   return {
     testId,
@@ -795,8 +802,8 @@ function abBuildComputedTestCard(sourceRow, resultsByTest, catalogIndex) {
     endedAt: abFormatSourceDateTime(abCellRaw(sourceRow, "O")),
     endedAtIso: endedAtIso || "",
     metrics,
-    finalStatusRaw: finalMetric?.statusRaw || "",
-    finalStatusKind: finalMetric?.statusKind || "unknown",
+    finalStatusRaw: metricsBlock.overallDecisionRaw,
+    finalStatusKind: abNormalizeStatus(metricsBlock.overallDecisionRaw),
     summaryChecks: {
       testCtr: metricsBlock.ctrDecisionRaw,
       testPrice: metricsBlock.priceDecisionRaw,
@@ -1058,15 +1065,23 @@ function renderAbTestCard(test) {
     )
     .join("");
 
-  const variantsHeaderCells = test.variants.map((variant) => `<th>Вариант ${variant.index}</th>`).join("");
+  const variantsHeaderCells = test.variants
+    .map(
+      (variant) => `<th class="${variant.isBest ? "is-best" : ""}">Вариант ${variant.index}${
+        variant.isBest ? '<span class="ab-variant-best-header">Лучшая</span>' : ""
+      }</th>`,
+    )
+    .join("");
   const imageCells = test.variants
     .map((variant) => {
       if (!variant.imageUrl) {
         return '<td><div class="ab-image-placeholder">нет обложки</div></td>';
       }
-      return `<td><a class="ab-cover-link" href="${abEscapeAttr(variant.imageUrl)}" target="_blank" rel="noopener noreferrer"><img src="${abEscapeAttr(
+      return `<td><div class="ab-cover-frame${variant.isBest ? " is-best" : ""}">${
+        variant.isBest ? '<span class="ab-variant-best-badge">Лучшая</span>' : ""
+      }<a class="ab-cover-link${variant.isBest ? " is-best" : ""}" href="${abEscapeAttr(variant.imageUrl)}" target="_blank" rel="noopener noreferrer"><img src="${abEscapeAttr(
         variant.imageUrl,
-      )}" alt="Обложка ${variant.index}" loading="lazy" decoding="async" /></a></td>`;
+      )}" alt="Обложка ${variant.index}" loading="lazy" decoding="async" /></a></div></td>`;
     })
     .join("");
 
