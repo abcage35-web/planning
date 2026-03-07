@@ -1,13 +1,14 @@
 const AB_DASHBOARD_SHEET_ID = "1ot5SxsmAl717cuvQbbXr1dVx1FQ99HTTzN1sG5z_RIc";
 const AB_DASHBOARD_FETCH_TIMEOUT_MS = 32000;
-const AB_DASHBOARD_SHEETS = Object.freeze({
-  summary: "[WB] Сводка : тесты CTR",
+const AB_DASHBOARD_SOURCE_SHEETS = Object.freeze({
+  catalog: "(*) Подложка",
+  technical: "(*) Техническая выгрузка",
   results: "(*) Результаты по обложкам XWAY",
 });
-const AB_VARIANT_COLS = Object.freeze(["Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF", "AG", "AH"]);
 const AB_STATUS_MAP = Object.freeze({
   WIN: "good",
   GOOD: "good",
+  EXCELLENT: "good",
   LOOSE: "bad",
   LOSE: "bad",
   BAD: "bad",
@@ -76,32 +77,6 @@ function abParseDateLiteral(valueRaw) {
 
   const date = new Date(year, month, day, hours, minutes, seconds);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function abParseSummaryDateTime(valueRaw) {
-  const value = String(valueRaw || "").trim();
-  if (!value) {
-    return "";
-  }
-  if (/^\d{4}-\d{2}-\d{2}\s*\n\s*\d{2}:\d{2}:\d{2}$/.test(value)) {
-    return value.replace(/\s*\n\s*/, " ");
-  }
-  const parts = value.split(/\s*\n\s*/);
-  if (parts.length >= 2 && /^\d{4}-\d{2}-\d{2}$/.test(parts[0])) {
-    return `${parts[0]} ${parts[1]}`;
-  }
-  const asIso = abParseDateLiteral(value);
-  if (!asIso) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(new Date(asIso));
 }
 
 function abToNumber(valueRaw) {
@@ -174,6 +149,104 @@ function abFormatHours(valueRaw) {
     return "—";
   }
   return `${value.toFixed(1).replace(".", ",")} ч`;
+}
+
+function abNormalizeNumericId(valueRaw) {
+  const value = abToInt(valueRaw);
+  if (!Number.isFinite(value)) {
+    const digits = String(valueRaw ?? "").match(/\d{3,}/);
+    return digits ? digits[0] : "";
+  }
+  return String(value);
+}
+
+function abFormatSourceDateTime(valueRaw) {
+  const text = String(valueRaw || "").trim();
+  if (!text) {
+    return "";
+  }
+  if (text.includes("\n")) {
+    return text;
+  }
+  const iso = abParseDateLiteral(valueRaw);
+  if (!iso) {
+    return text;
+  }
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(new Date(iso));
+}
+
+function abFormatVariantDateTime(valueRaw) {
+  const iso = typeof valueRaw === "string" && valueRaw.includes("T") ? valueRaw : abParseDateLiteral(valueRaw);
+  if (!iso) {
+    return "";
+  }
+  const date = new Date(iso);
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${String(date.getFullYear()).slice(-2)}\n${pad(date.getHours())}:${pad(
+    date.getMinutes(),
+  )}:${pad(date.getSeconds())}`;
+}
+
+function abResolveCabinet(testNameRaw) {
+  const testName = String(testNameRaw || "").trim();
+  if (!testName) {
+    return "?";
+  }
+  if (/^\s*С\s*\//u.test(testName) || /Сытин/u.test(testName)) {
+    return "Сытин";
+  }
+  if (/^\s*П\s*\//u.test(testName) || /Карпачев/u.test(testName)) {
+    return "Карпачев";
+  }
+  return "?";
+}
+
+function abStatusRawFromKind(kind) {
+  switch (kind) {
+    case "good":
+      return "WIN";
+    case "bad":
+      return "LOOSE";
+    case "auto":
+      return "Авто";
+    case "neutral":
+      return "NORMAL";
+    default:
+      return "?";
+  }
+}
+
+function abFiniteNumber(valueRaw) {
+  const value = Number(valueRaw);
+  return Number.isFinite(value) ? value : null;
+}
+
+function abSafeDivide(numeratorRaw, denominatorRaw) {
+  const numerator = abFiniteNumber(numeratorRaw);
+  const denominator = abFiniteNumber(denominatorRaw);
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) {
+    return null;
+  }
+  return numerator / denominator;
+}
+
+function abFormatPlainNumber(valueRaw) {
+  const value = Number(valueRaw);
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  const hasFraction = Math.abs(value % 1) > 0.0001;
+  return new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: hasFraction ? 2 : 0,
+    maximumFractionDigits: hasFraction ? 2 : 0,
+  }).format(value);
 }
 
 function abNormalizeStatus(rawValue) {
@@ -355,57 +428,6 @@ function abCellText(row, id) {
   return String(value).trim();
 }
 
-function abCellDisplay(row, id, options = {}) {
-  const cell = abCell(row, id);
-  const formatted = String(cell.f || "").trim();
-  if (formatted) {
-    return formatted;
-  }
-
-  const value = cell.v;
-  if (value === null || value === undefined || value === "") {
-    return "—";
-  }
-
-  const valueType = options.type || "text";
-  if (valueType === "percent-fraction") {
-    return abFormatFractionToPercent(value, options.digits ?? 2);
-  }
-  if (valueType === "percent-signed-fraction") {
-    return abFormatSignedPercentFraction(value, options.digits ?? 0);
-  }
-  if (valueType === "hours") {
-    return abFormatHours(value);
-  }
-  if (valueType === "int") {
-    return abFormatInt(value);
-  }
-
-  if (typeof value === "number") {
-    return abFormatInt(value);
-  }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return "—";
-    }
-    const parsedDate = abParseDateLiteral(trimmed);
-    if (parsedDate) {
-      return new Intl.DateTimeFormat("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }).format(new Date(parsedDate));
-    }
-    return trimmed;
-  }
-
-  return String(value);
-}
-
 function abNormalizeTestId(valueRaw) {
   const digits = String(valueRaw ?? "").match(/\d{3,}/);
   return digits ? digits[0] : "";
@@ -435,7 +457,7 @@ function abParseResultIndex(resultsSheet) {
     const installedAt = abParseDateLiteral(installedRaw);
     const installedLabel = String(abCell(row, "D").f || "").trim();
 
-    const shouldInclude = Boolean(installedAt || views > 0 || clicks > 0);
+    const shouldInclude = views > 0;
     if (!shouldInclude) {
       continue;
     }
@@ -472,241 +494,340 @@ function abParseResultIndex(resultsSheet) {
   return map;
 }
 
-function abExtractOverview(summarySheet) {
-  const rows = Array.isArray(summarySheet?.rows) ? summarySheet.rows : [];
-  const overviewRows = [];
-  let headerRow = null;
+function abBuildCatalogIndex(catalogSheet) {
+  const rows = Array.isArray(catalogSheet?.rows) ? catalogSheet.rows : [];
+  const map = new Map();
 
   for (const row of rows) {
-    const colC = abCellText(row, "C");
-    if (colC === "Ссылка на XWay") {
-      headerRow = row;
-      break;
-    }
-
-    const testId = abNormalizeTestId(abCellRaw(row, "B"));
-    if (testId) {
+    const article = abNormalizeNumericId(abCellRaw(row, "C"));
+    if (!article) {
       continue;
     }
-
-    const summaryLabel = abCellText(row, "L");
-    const metricTotal = abCellText(row, "M");
-    if (!summaryLabel && !metricTotal) {
+    if (map.has(article)) {
       continue;
     }
-
-    overviewRows.push({
-      date: abCellText(row, "C") || "—",
-      label: summaryLabel || "—",
-      colM: metricTotal || "—",
-      colN: abCellText(row, "N") || "—",
-      colO: abCellText(row, "O") || "—",
-      colP: abCellText(row, "P") || "—",
-      colQ: abCellText(row, "Q") || "—",
-      colS: abCellText(row, "S") || "—",
+    map.set(article, {
+      crmId: abNormalizeNumericId(abCellRaw(row, "A")),
+      offerId: String(abCellText(row, "D") || "").trim(),
+      productName: String(abCellText(row, "E") || "").trim(),
+      wbUrl: String(abCellText(row, "F") || "").trim(),
     });
   }
 
-  const header = {
-    colM: abCellText(headerRow, "M") || "Тест изм. цены",
-    colN: abCellText(headerRow, "N") || "ИТОГ ОК",
-    colO: abCellText(headerRow, "O") || "Тест CTR*CR1",
-    colP: abCellText(headerRow, "P") || "ИТОГ ОВР",
-    colQ: abCellText(headerRow, "Q") || "Ручная",
-    colS: abCellText(headerRow, "S") || "Итог",
-  };
-
-  return { overviewRows, header };
+  return map;
 }
 
-function abFindHeaderRowIndex(summaryRows) {
-  for (let i = 0; i < summaryRows.length; i += 1) {
-    if (abCellText(summaryRows[i], "C") === "Ссылка на XWay") {
-      return i;
-    }
+function abResolveCtrDecisionRaw(boostCtr) {
+  if (!Number.isFinite(boostCtr)) {
+    return "?";
   }
-  return -1;
+  return boostCtr > 0 ? "WIN" : "LOOSE";
 }
 
-function abBuildTestCards(summarySheet, resultsByTest) {
-  const summaryRows = Array.isArray(summarySheet?.rows) ? summarySheet.rows : [];
-  const startIndex = Math.max(0, abFindHeaderRowIndex(summaryRows) + 1);
-  const rows = summaryRows.slice(startIndex).filter((row) => abNormalizeTestId(abCellRaw(row, "B")));
+function abResolveCtrCr1DecisionRaw(boostCtrCr1) {
+  if (!Number.isFinite(boostCtrCr1)) {
+    return "?";
+  }
+  return boostCtrCr1 >= 0.1 ? "WIN" : "LOOSE";
+}
 
-  const grouped = [];
-  let current = null;
+function abResolvePriceDecisionRaw(priceDuringDelta, priceAfterDelta) {
+  const deltas = [priceDuringDelta, priceAfterDelta].filter((value) => Number.isFinite(value));
+  if (!deltas.length) {
+    return "?";
+  }
+  return Math.min(...deltas) < -0.06 ? "LOOSE" : "WIN";
+}
+
+function abBuildComputedReportLines(metrics) {
+  const lines = [];
+  lines.push(`Буст CTR : ${abFormatFractionToPercent(metrics.boostCtr, 0)}`);
+  lines.push(`Изначальный CTR : ${abFormatFractionToPercent(metrics.oldCtr, 2)}`);
+  lines.push(`Лучший CTR : ${abFormatFractionToPercent(metrics.maxCtr, 2)}`);
+  lines.push(" ");
+  lines.push(`Буст CTR*CR1 : ${abFormatFractionToPercent(metrics.boostCtrCr1, 0)}`);
+  lines.push(`CTR*CR1 до : ${abFormatFractionToPercent(metrics.ctrCr1Before, 2)}`);
+  lines.push(`CTR*CR1 после : ${abFormatFractionToPercent(metrics.ctrCr1After, 2)}`);
+  lines.push(" ");
+  lines.push(`Мин. изменение цены : ${abFormatFractionToPercent(metrics.minPriceDelta, 2)}`);
+  lines.push(`Макс. изменение цены : ${abFormatFractionToPercent(metrics.maxPriceDelta, 2)}`);
+  return lines.filter((line) => line.trim() || line === " ");
+}
+
+function abBuildVariantCards(resultsList) {
+  const prepared = (Array.isArray(resultsList) ? resultsList : []).map((item, index, list) => {
+    const ctrValue = Number.isFinite(item.views) && item.views > 0 ? item.clicks / item.views : item.ctr;
+    const next = list[index + 1] || null;
+    const hoursValue =
+      item.installedAt && next?.installedAt
+        ? (new Date(next.installedAt).getTime() - new Date(item.installedAt).getTime()) / 3600000
+        : null;
+
+    return {
+      index: index + 1,
+      imageUrl: item.coverUrl,
+      viewsValue: item.views,
+      clicksValue: item.clicks,
+      ctrValue,
+      installedAtIso: item.installedAt || "",
+      views: abFormatInt(item.views),
+      clicks: abFormatInt(item.clicks),
+      ctr: Number.isFinite(ctrValue) ? abFormatFractionToPercent(ctrValue, 2) : "—",
+      installedAt: item.installedAt ? abFormatVariantDateTime(item.installedAt) : "—",
+      hours: Number.isFinite(hoursValue) && hoursValue >= 0 ? abFormatHours(hoursValue) : "—",
+    };
+  });
+
+  if (prepared.length) {
+    return prepared;
+  }
+
+  return [
+    {
+      index: 1,
+      imageUrl: "",
+      viewsValue: null,
+      clicksValue: null,
+      ctrValue: null,
+      installedAtIso: "",
+      views: "—",
+      clicks: "—",
+      ctr: "—",
+      installedAt: "—",
+      hours: "—",
+    },
+  ];
+}
+
+function abBuildComputedMetricsBlock(sourceRow, variants) {
+  const variantCtrValues = variants.map((item) => item.ctrValue).filter((value) => Number.isFinite(value));
+  const oldCtr = Number.isFinite(variantCtrValues[0]) ? variantCtrValues[0] : abToNumber(abCellRaw(sourceRow, "R"));
+  const challengerCtrValues = variantCtrValues.slice(1);
+  const maxCtr = challengerCtrValues.length ? Math.max(...challengerCtrValues) : oldCtr;
+  const boostCtr = Number.isFinite(oldCtr) && oldCtr !== 0 && Number.isFinite(maxCtr) ? maxCtr / oldCtr - 1 : null;
+
+  const ctrBefore = abToNumber(abCellRaw(sourceRow, "R"));
+  const ctrAfter = abToNumber(abCellRaw(sourceRow, "V"));
+  const cr1Before = abToNumber(abCellRaw(sourceRow, "S"));
+  const cr1After = abToNumber(abCellRaw(sourceRow, "W"));
+  const cr2Before = abToNumber(abCellRaw(sourceRow, "T"));
+  const cr2After = abToNumber(abCellRaw(sourceRow, "X"));
+
+  const ctrCr1Before = Number.isFinite(ctrBefore) && Number.isFinite(cr1Before) ? ctrBefore * cr1Before : abToNumber(abCellRaw(sourceRow, "Q"));
+  const ctrCr1After = Number.isFinite(ctrAfter) && Number.isFinite(cr1After) ? ctrAfter * cr1After : abToNumber(abCellRaw(sourceRow, "U"));
+  const boostCtrCr1 =
+    Number.isFinite(ctrCr1Before) && ctrCr1Before !== 0 && Number.isFinite(ctrCr1After) ? ctrCr1After / ctrCr1Before - 1 : -1;
+
+  const priceBefore = abToNumber(abCellRaw(sourceRow, "AU"));
+  const priceDuring = abToNumber(abCellRaw(sourceRow, "AV"));
+  const priceAfter = abToNumber(abCellRaw(sourceRow, "AW"));
+  const priceDeltaBefore = abToNumber(abCellRaw(sourceRow, "Z"));
+  const priceDeltaDuring =
+    Number.isFinite(priceBefore) && priceBefore !== 0 && Number.isFinite(priceDuring) ? priceDuring / priceBefore - 1 : abToNumber(abCellRaw(sourceRow, "AA"));
+  const priceDeltaAfter =
+    Number.isFinite(priceDuring) && priceDuring !== 0 && Number.isFinite(priceAfter) ? priceAfter / priceDuring - 1 : abToNumber(abCellRaw(sourceRow, "AB"));
+
+  const priceDecisionRaw = abResolvePriceDecisionRaw(priceDeltaDuring, priceDeltaAfter);
+  const ctrDecisionRaw = abResolveCtrDecisionRaw(boostCtr);
+  const ctrCr1DecisionRaw = abResolveCtrCr1DecisionRaw(boostCtrCr1);
+  const overallDecisionRaw =
+    ctrDecisionRaw === "WIN" && ctrCr1DecisionRaw === "WIN" && priceDecisionRaw === "WIN" ? "WIN" : "LOOSE";
+  const manualDecisionRaw =
+    ctrDecisionRaw === "WIN" && ctrCr1DecisionRaw === "LOOSE" && priceDecisionRaw === "WIN" ? "LOOSE" : "?";
+
+  const priceDeltas = [priceDeltaDuring, priceDeltaAfter].filter((value) => Number.isFinite(value));
+  const minPriceDelta = priceDeltas.length ? Math.min(...priceDeltas) : null;
+  const maxPriceDelta = priceDeltas.length ? Math.max(0, ...priceDeltas) : null;
+
+  return {
+    oldCtr,
+    maxCtr,
+    boostCtr,
+    ctrBefore,
+    ctrAfter,
+    cr1Before,
+    cr1After,
+    cr2Before,
+    cr2After,
+    ctrCr1Before,
+    ctrCr1After,
+    boostCtrCr1,
+    priceBefore,
+    priceDuring,
+    priceAfter,
+    priceDeltaBefore,
+    priceDeltaDuring,
+    priceDeltaAfter,
+    minPriceDelta,
+    maxPriceDelta,
+    priceDecisionRaw,
+    ctrDecisionRaw,
+    ctrCr1DecisionRaw,
+    overallDecisionRaw,
+    manualDecisionRaw,
+  };
+}
+
+function abBuildComputedTestCard(sourceRow, resultsByTest, catalogIndex) {
+  const testId = abNormalizeTestId(abCellRaw(sourceRow, "E"));
+  if (!testId) {
+    return null;
+  }
+
+  const article = abNormalizeNumericId(abCellRaw(sourceRow, "A"));
+  const catalog = catalogIndex.get(article) || null;
+  const testTitle = String(abCellText(sourceRow, "AY") || "").trim();
+  const productName = String(abCellText(sourceRow, "AX") || "").trim() || catalog?.productName || testTitle || "—";
+  const wbUrl = String(abCellText(sourceRow, "B") || "").trim() || catalog?.wbUrl || "";
+  const xwayUrl = String(abCellText(sourceRow, "F") || "").trim();
+  const startedAtIso = abParseDateLiteral(abCellRaw(sourceRow, "M"));
+  const endedAtIso = abParseDateLiteral(abCellRaw(sourceRow, "O"));
+
+  const variants = abBuildVariantCards(resultsByTest.get(testId));
+  const metricsBlock = abBuildComputedMetricsBlock(sourceRow, variants);
+
+  const metrics = [
+    {
+      checkName: "Тест CTR",
+      label: "Буст CTR",
+      valueText: abFormatFractionToPercent(metricsBlock.boostCtr, 0),
+      statusRaw: metricsBlock.ctrDecisionRaw,
+      statusKind: abNormalizeStatus(metricsBlock.ctrDecisionRaw),
+    },
+    {
+      checkName: "Тест CTR*CR1",
+      label: "Буст CTR*CR1",
+      valueText: abFormatFractionToPercent(metricsBlock.boostCtrCr1, 0),
+      statusRaw: metricsBlock.ctrCr1DecisionRaw,
+      statusKind: abNormalizeStatus(metricsBlock.ctrCr1DecisionRaw),
+    },
+    {
+      checkName: "Тест изм. цены",
+      label: "Old CTR",
+      valueText: abFormatFractionToPercent(metricsBlock.oldCtr, 2),
+      statusRaw: metricsBlock.priceDecisionRaw,
+      statusKind: abNormalizeStatus(metricsBlock.priceDecisionRaw),
+    },
+    {
+      checkName: "",
+      label: "Max CTR",
+      valueText: abFormatFractionToPercent(metricsBlock.maxCtr, 2),
+      statusRaw: "",
+      statusKind: "unknown",
+    },
+    {
+      checkName: "Подсчет CTR*CR1",
+      label: "CTR*CR1 до",
+      valueText: abFormatFractionToPercent(metricsBlock.ctrCr1Before, 2),
+      statusRaw: "Авто",
+      statusKind: "auto",
+    },
+    {
+      checkName: "ИТОГ",
+      label: "CTR*CR1 после",
+      valueText: abFormatFractionToPercent(metricsBlock.ctrCr1After, 2),
+      statusRaw: metricsBlock.overallDecisionRaw,
+      statusKind: abNormalizeStatus(metricsBlock.overallDecisionRaw),
+    },
+  ];
+
+  const priceRows = [
+    { label: "Кол-во откл. цены", value: abFormatInt(abToNumber(abCellRaw(sourceRow, "Y"))) },
+    { label: "Средняя цена до теста", value: abFormatInt(metricsBlock.priceBefore) },
+    { label: "Средняя цена во время теста", value: abFormatInt(metricsBlock.priceDuring) },
+    { label: "Средняя цена после", value: abFormatInt(metricsBlock.priceAfter) },
+  ];
+
+  const priceDeltaRows = [
+    { label: "Изменение цены за день до теста от среднего, %", value: abFormatFractionToPercent(metricsBlock.priceDeltaBefore, 0) },
+    { label: "Изменение цены во время теста от среднего, %", value: abFormatFractionToPercent(metricsBlock.priceDeltaDuring, 0) },
+    { label: "Изменение цены через день после теста от среднего, %", value: abFormatFractionToPercent(metricsBlock.priceDeltaAfter, 0) },
+  ];
+
+  const ocrBefore =
+    Number.isFinite(metricsBlock.ctrBefore) && Number.isFinite(metricsBlock.cr1Before) && Number.isFinite(metricsBlock.cr2Before)
+      ? metricsBlock.ctrBefore * metricsBlock.cr1Before * metricsBlock.cr2Before * 100
+      : null;
+  const ocrAfter =
+    Number.isFinite(metricsBlock.ctrAfter) && Number.isFinite(metricsBlock.cr1After) && Number.isFinite(metricsBlock.cr2After)
+      ? metricsBlock.ctrAfter * metricsBlock.cr1After * metricsBlock.cr2After * 100
+      : null;
+
+  const funnelRows = [
+    { label: "CTR", before: abFormatFractionToPercent(metricsBlock.ctrBefore, 2), after: abFormatFractionToPercent(metricsBlock.ctrAfter, 2) },
+    { label: "CR1", before: abFormatFractionToPercent(metricsBlock.cr1Before, 2), after: abFormatFractionToPercent(metricsBlock.cr1After, 2) },
+    { label: "CR2", before: abFormatFractionToPercent(metricsBlock.cr2Before, 2), after: abFormatFractionToPercent(metricsBlock.cr2After, 2) },
+    {
+      label: "CTR*CR1",
+      before: abFormatFractionToPercent(metricsBlock.ctrCr1Before, 2),
+      after: abFormatFractionToPercent(metricsBlock.ctrCr1After, 2),
+    },
+    { label: "OCR*100", before: abFormatPlainNumber(ocrBefore), after: abFormatPlainNumber(ocrAfter) },
+  ];
+
+  const reportLines = abBuildComputedReportLines(metricsBlock);
+  const finalMetric = metrics[metrics.length - 1];
+
+  return {
+    testId,
+    xwayUrl,
+    wbUrl,
+    article,
+    title: testTitle || productName,
+    productName,
+    type: String(abCellText(sourceRow, "D") || "").trim(),
+    cabinet: abResolveCabinet(testTitle),
+    startedAt: abFormatSourceDateTime(abCellRaw(sourceRow, "M")),
+    startedAtIso: startedAtIso || "",
+    endedAt: abFormatSourceDateTime(abCellRaw(sourceRow, "O")),
+    endedAtIso: endedAtIso || "",
+    metrics,
+    finalStatusRaw: finalMetric?.statusRaw || "",
+    finalStatusKind: finalMetric?.statusKind || "unknown",
+    summaryChecks: {
+      testPrice: metricsBlock.priceDecisionRaw,
+      resultOk: metricsBlock.ctrDecisionRaw,
+      testCtrCr1: metricsBlock.ctrCr1DecisionRaw,
+      resultOvr: metricsBlock.overallDecisionRaw,
+      manual: metricsBlock.manualDecisionRaw,
+    },
+    variants,
+    priceRows,
+    priceDeltaRows,
+    funnelRows,
+    reportLines,
+    reportText: reportLines.join("\n"),
+  };
+}
+
+function abBuildTestCardsFromTechnical(technicalSheet, resultsByTest, catalogIndex) {
+  const rows = Array.isArray(technicalSheet?.rows) ? technicalSheet.rows : [];
+  const rowsByTestId = new Map();
+
   for (const row of rows) {
-    const testId = abNormalizeTestId(abCellRaw(row, "B"));
+    const testId = abNormalizeTestId(abCellRaw(row, "E"));
     if (!testId) {
       continue;
     }
-    if (!current || current.testId !== testId) {
-      current = { testId, rows: [] };
-      grouped.push(current);
+    const current = rowsByTestId.get(testId);
+    const currentMs = current ? new Date(abParseDateLiteral(abCellRaw(current, "M")) || 0).getTime() : -1;
+    const nextMs = new Date(abParseDateLiteral(abCellRaw(row, "M")) || 0).getTime();
+    if (!current || nextMs >= currentMs) {
+      rowsByTestId.set(testId, row);
     }
-    current.rows.push(row);
   }
 
-  const cards = [];
-
-  for (const group of grouped) {
-    const testId = group.testId;
-    const rows6 = group.rows.slice(0, 6);
-    if (rows6.length < 2) {
-      continue;
-    }
-
-    const base = rows6[0];
-    const viewRow = rows6.find((row) => String(abCellText(row, "X")).toUpperCase() === "VIEW") || rows6[1] || base;
-    const clickRow = rows6.find((row) => String(abCellText(row, "X")).toUpperCase() === "CLICK") || rows6[2] || base;
-    const ctrRow = rows6.find((row) => String(abCellText(row, "X")).toUpperCase() === "CTR") || rows6[3] || base;
-    const installRow = rows6.find((row) => String(abCellText(row, "X")).toLowerCase().includes("установка")) || rows6[4] || base;
-    const hoursRow = rows6.find((row) => String(abCellText(row, "X")).toLowerCase().includes("часы")) || rows6[5] || base;
-
-    const metrics = rows6
-      .map((row) => {
-        const label = abCellText(row, "U");
-        const statusRaw = abCellText(row, "T");
-        const valueCell = abCell(row, "V");
-        const valueText = String(valueCell.f || "").trim() || (() => {
-          const valueRaw = valueCell.v;
-          if (typeof valueRaw !== "number") {
-            return abCellDisplay(row, "V");
-          }
-          if (/CTR/i.test(label)) {
-            return abFormatFractionToPercent(valueRaw, 2);
-          }
-          return abFormatInt(valueRaw);
-        })();
-        return {
-          checkName: abCellText(row, "S"),
-          label,
-          valueText,
-          statusRaw,
-          statusKind: abNormalizeStatus(statusRaw),
-        };
-      })
-      .filter((item) => item.label);
-
-    const finalMetric = metrics.find((item) => String(item.checkName).toUpperCase() === "ИТОГ") || metrics[metrics.length - 1] || null;
-
-    const resultVariants = Array.isArray(resultsByTest.get(testId)) ? resultsByTest.get(testId) : [];
-
-    const summaryVariantCount = AB_VARIANT_COLS.reduce((max, col) => {
-      const hasAny = [viewRow, clickRow, ctrRow, hoursRow].some((row) => {
-        const value = abCellRaw(row, col);
-        return value !== null && value !== undefined && String(value).trim() !== "";
-      });
-      return hasAny ? max + 1 : max;
-    }, 0);
-
-    const variantCount = Math.max(summaryVariantCount, resultVariants.length, 1);
-
-    const variants = [];
-    for (let i = 0; i < variantCount; i += 1) {
-      const col = AB_VARIANT_COLS[i];
-      const result = resultVariants[i] || null;
-      const installedText = result?.installedLabel || (installRow && col ? abCellDisplay(installRow, col) : "—");
-      variants.push({
-        index: i + 1,
-        imageUrl: result?.coverUrl || "",
-        views: col ? abCellDisplay(viewRow, col, { type: "int" }) : "—",
-        clicks: col ? abCellDisplay(clickRow, col, { type: "int" }) : "—",
-        ctr: col ? abCellDisplay(ctrRow, col, { type: "percent-fraction", digits: 2 }) : "—",
-        installedAt: installedText || "—",
-        hours: col ? abCellDisplay(hoursRow, col, { type: "hours" }) : "—",
-      });
-    }
-
-    const priceRows = rows6
-      .slice(0, 4)
-      .map((row) => {
-        const label = abCellText(row, "AJ");
-        const value = abCellDisplay(row, "AK", { type: "int" });
-        if (!label) {
-          return null;
-        }
-        return { label, value };
-      })
-      .filter(Boolean);
-
-    const priceDeltaRows = rows6
-      .slice(0, 4)
-      .map((row) => {
-        const label = abCellText(row, "AL");
-        if (!label) {
-          return null;
-        }
-        const cell = abCell(row, "AM");
-        const value = String(cell.f || "").trim() || abCellDisplay(row, "AM", { type: "percent-signed-fraction", digits: 0 });
-        return { label, value };
-      })
-      .filter(Boolean);
-
-    const funnelRows = [];
-    const usedFunnel = new Set();
-    for (const row of rows6) {
-      const metricLabel = abCellText(row, "AO") || abCellText(row, "AS");
-      if (!metricLabel || usedFunnel.has(metricLabel)) {
-        continue;
+  return Array.from(rowsByTestId.values())
+    .map((row) => abBuildComputedTestCard(row, resultsByTest, catalogIndex))
+    .filter(Boolean)
+    .sort((a, b) => {
+      const aMs = a.startedAtIso ? new Date(a.startedAtIso).getTime() : 0;
+      const bMs = b.startedAtIso ? new Date(b.startedAtIso).getTime() : 0;
+      if (aMs !== bMs) {
+        return bMs - aMs;
       }
-      const before = abCellDisplay(row, "AP", { type: "percent-fraction", digits: 2 });
-      const after = abCellDisplay(row, "AQ", { type: "percent-fraction", digits: 2 });
-      if (before === "—" && after === "—") {
-        continue;
-      }
-      usedFunnel.add(metricLabel);
-      funnelRows.push({ label: metricLabel, before, after });
-    }
-
-    const reportText = String(abCellText(base, "L") || "").trim();
-    const reportLines = reportText
-      .split(/\n+/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    const startedAt = abParseSummaryDateTime(abCellRaw(base, "J"));
-    const endedAt = abParseSummaryDateTime(abCellRaw(base, "K"));
-
-    cards.push({
-      testId,
-      xwayUrl: String(abCellText(base, "C") || "").trim(),
-      wbUrl: String(abCellText(base, "G") || "").trim(),
-      article: String(abCellText(base, "F") || "").trim(),
-      title: String(abCellText(base, "D") || "").trim(),
-      type: String(abCellText(base, "E") || "").trim(),
-      cabinet: String(abCellText(base, "H") || "").trim(),
-      startedAt,
-      endedAt,
-      metrics,
-      finalStatusRaw: finalMetric?.statusRaw || "",
-      finalStatusKind: finalMetric?.statusKind || "unknown",
-      summaryChecks: {
-        testPrice: abCellText(base, "M"),
-        resultOk: abCellText(base, "N"),
-        testCtrCr1: abCellText(base, "O"),
-        resultOvr: abCellText(base, "P"),
-        manual: abCellText(base, "Q"),
-      },
-      variants,
-      priceRows,
-      priceDeltaRows,
-      funnelRows,
-      reportLines,
-      reportText,
+      return Number(b.testId || 0) - Number(a.testId || 0);
     });
-  }
-
-  cards.sort((a, b) => {
-    const aMs = a.startedAt ? new Date(a.startedAt).getTime() : 0;
-    const bMs = b.startedAt ? new Date(b.startedAt).getTime() : 0;
-    if (aMs !== bMs) {
-      return bMs - aMs;
-    }
-    return Number(b.testId || 0) - Number(a.testId || 0);
-  });
-
-  return cards;
 }
 
 function abBuildProducts(tests) {
@@ -719,7 +840,7 @@ function abBuildProducts(tests) {
     if (!map.has(key)) {
       map.set(key, {
         article: key,
-        title: test.title,
+        title: test.productName || test.title,
         type: test.type,
         cabinetSet: new Set(),
         tests: [],
@@ -777,12 +898,13 @@ function abBuildProducts(tests) {
 }
 
 function buildAbDashboardModel(source) {
-  const summary = source?.summary;
+  const catalog = source?.catalog;
+  const technical = source?.technical;
   const results = source?.results;
 
-  const overview = abExtractOverview(summary);
+  const catalogIndex = abBuildCatalogIndex(catalog);
   const resultsByTest = abParseResultIndex(results);
-  const tests = abBuildTestCards(summary, resultsByTest);
+  const tests = abBuildTestCardsFromTechnical(technical, resultsByTest, catalogIndex);
   const products = abBuildProducts(tests);
 
   const cabinets = Array.from(new Set(tests.map((item) => item.cabinet).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ru"));
@@ -803,11 +925,11 @@ function buildAbDashboardModel(source) {
   return {
     tests,
     products,
-    overview,
     cabinets,
     statusTotals,
     rowCounts: {
-      summary: Array.isArray(summary?.rows) ? summary.rows.length : 0,
+      catalog: Array.isArray(catalog?.rows) ? catalog.rows.length : 0,
+      technical: Array.isArray(technical?.rows) ? technical.rows.length : 0,
       results: Array.isArray(results?.rows) ? results.rows.length : 0,
     },
   };
@@ -822,53 +944,6 @@ function abSafeLink(urlRaw, label) {
   return `<a class="ab-link" href="${abEscapeAttr(url)}" target="_blank" rel="noopener noreferrer">${icon}<span>${abEscapeHtml(
     label || "Открыть",
   )}</span></a>`;
-}
-
-function renderAbOverview(model) {
-  const rows = model?.overview?.overviewRows || [];
-  const header = model?.overview?.header || {};
-  if (!rows.length) {
-    return "";
-  }
-
-  const tbody = rows
-    .map(
-      (row) => `<tr>
-      <td>${abEscapeHtml(row.date)}</td>
-      <td>${abEscapeHtml(row.label)}</td>
-      <td>${abEscapeHtml(row.colM)}</td>
-      <td>${abEscapeHtml(row.colN)}</td>
-      <td>${abEscapeHtml(row.colO)}</td>
-      <td>${abEscapeHtml(row.colP)}</td>
-      <td>${abEscapeHtml(row.colQ)}</td>
-      <td>${abEscapeHtml(row.colS)}</td>
-    </tr>`,
-    )
-    .join("");
-
-  return `<article class="ab-overview-card">
-    <div class="ab-overview-head">
-      <h3>Сводка (как в листе)</h3>
-      <span class="subtle">Формулы и значения берутся из вкладки «[WB] Сводка : тесты CTR»</span>
-    </div>
-    <div class="ab-overview-table-wrap">
-      <table class="ab-overview-table">
-        <thead>
-          <tr>
-            <th>Дата</th>
-            <th>Кабинет</th>
-            <th>${abEscapeHtml(header.colM || "Тест изм. цены")}</th>
-            <th>${abEscapeHtml(header.colN || "ИТОГ ОК")}</th>
-            <th>${abEscapeHtml(header.colO || "Тест CTR*CR1")}</th>
-            <th>${abEscapeHtml(header.colP || "ИТОГ ОВР")}</th>
-            <th>${abEscapeHtml(header.colQ || "Ручная")}</th>
-            <th>${abEscapeHtml(header.colS || "Итог")}</th>
-          </tr>
-        </thead>
-        <tbody>${tbody}</tbody>
-      </table>
-    </div>
-  </article>`;
 }
 
 function renderAbFilterToolbar(model, filteredTests) {
@@ -1022,7 +1097,7 @@ function renderAbTestCard(test) {
           </table>
         </div>
         <div class="ab-report-card">
-          <h5>Отчет из сводки</h5>
+          <h5>Отчет по расчетам</h5>
           ${reportHtml}
         </div>
       </section>
@@ -1191,7 +1266,7 @@ function renderAbDashboardContent() {
   if (abDashboardStore.loading) {
     contentEl.innerHTML = `<div class="ab-tests-state-card">
       <span class="ab-tests-state-spinner" aria-hidden="true"></span>
-      <span>Загружаю данные из «[WB] Сводка : тесты CTR»…</span>
+      <span>Загружаю AB-выгрузки и пересчитываю тесты…</span>
     </div>`;
     return;
   }
@@ -1212,15 +1287,15 @@ function renderAbDashboardContent() {
 
   if (metaEl) {
     const fetchedLabel = abDashboardStore.fetchedAt ? formatDateTime(abDashboardStore.fetchedAt) : "-";
-    metaEl.textContent = `Источник формул: [WB] Сводка : тесты CTR. Медиа: (*) Результаты по обложкам XWAY. Обновлено: ${fetchedLabel}`;
+    metaEl.textContent = `Источники: (*) Подложка, (*) Техническая выгрузка, (*) Результаты по обложкам XWAY. Обновлено: ${fetchedLabel}`;
   }
 
   const filteredTests = abFilterTests(model);
   const filteredProducts = abBuildProductsFromFilteredTests(filteredTests);
 
-  const sourceRowsLabel = `Строк в сводке: ${abFormatInt(model.rowCounts.summary)} · строк в результатах обложек: ${abFormatInt(
-    model.rowCounts.results,
-  )}`;
+  const sourceRowsLabel = `Строк в подложке: ${abFormatInt(model.rowCounts.catalog)} · строк в техвыгрузке: ${abFormatInt(
+    model.rowCounts.technical,
+  )} · строк в результатах обложек: ${abFormatInt(model.rowCounts.results)}`;
 
   const showTests = abDashboardStore.filters.view === "tests" || abDashboardStore.filters.view === "both";
   const showProducts = abDashboardStore.filters.view === "products" || abDashboardStore.filters.view === "both";
@@ -1228,7 +1303,6 @@ function renderAbDashboardContent() {
   contentEl.innerHTML = `
     ${renderAbFilterToolbar(model, filteredTests)}
     <div class="ab-source-line">${abEscapeHtml(sourceRowsLabel)}</div>
-    ${renderAbOverview(model)}
     ${showTests ? renderAbTestsSection(filteredTests) : ""}
     ${showProducts ? renderAbProductsSection(filteredProducts) : ""}
   `;
@@ -1307,9 +1381,13 @@ async function loadAbDashboardData(options = {}) {
   abDashboardStore.error = "";
   renderAbDashboardContent();
 
-  const request = Promise.all([fetchAbSheetRaw(AB_DASHBOARD_SHEETS.summary), fetchAbSheetRaw(AB_DASHBOARD_SHEETS.results)])
-    .then(([summary, results]) => {
-      const model = buildAbDashboardModel({ summary, results });
+  const request = Promise.all([
+    fetchAbSheetRaw(AB_DASHBOARD_SOURCE_SHEETS.catalog),
+    fetchAbSheetRaw(AB_DASHBOARD_SOURCE_SHEETS.technical),
+    fetchAbSheetRaw(AB_DASHBOARD_SOURCE_SHEETS.results),
+  ])
+    .then(([catalog, technical, results]) => {
+      const model = buildAbDashboardModel({ catalog, technical, results });
       abDashboardStore.loaded = true;
       abDashboardStore.data = model;
       abDashboardStore.fetchedAt = new Date().toISOString();
