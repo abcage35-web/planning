@@ -2,7 +2,7 @@ const AB_DASHBOARD_SHEET_ID = "1ot5SxsmAl717cuvQbbXr1dVx1FQ99HTTzN1sG5z_RIc";
 const AB_DASHBOARD_FETCH_TIMEOUT_MS = 32000;
 const AB_FILTER_DATE_FROM_DEFAULT = "2025-01-01";
 const AB_TEST_LIMIT_OPTIONS = Object.freeze([50, 100, 150, 200, 250, 300]);
-const AB_MATRIX_METRIC_COL_WIDTH = 260;
+const AB_MATRIX_METRIC_COL_WIDTH = 164;
 const AB_MATRIX_VARIANT_COL_WIDTH = 150;
 const AB_DASHBOARD_SOURCE_SHEETS = Object.freeze({
   catalog: "(*) Подложка",
@@ -1524,15 +1524,15 @@ function renderAbTestCard(test) {
             </thead>
             <tbody>
               <tr class="is-image">
-                <th>IMAGE</th>
+                <th>Обложка</th>
                 ${imageCells}
               </tr>
               <tr>
-                <th>VIEW</th>
+                <th>Показы</th>
                 ${viewsCells}
               </tr>
               <tr>
-                <th>CLICK</th>
+                <th>Клики</th>
                 ${clicksCells}
               </tr>
               <tr>
@@ -1540,11 +1540,11 @@ function renderAbTestCard(test) {
                 ${ctrCells}
               </tr>
               <tr>
-                <th>Установка (Дата / Время)</th>
+                <th>Время установки</th>
                 ${installCells}
               </tr>
               <tr>
-                <th>Часы работы обложки</th>
+                <th>Время активности</th>
                 ${hoursCells}
               </tr>
             </tbody>
