@@ -998,11 +998,10 @@ body {
 }
 
 .ab-variant-matrix {
-  width: 100%;
   height: 100%;
-  min-width: 720px;
   table-layout: fixed;
   border-collapse: collapse;
+  flex: 0 0 auto;
 }
 
 .ab-variant-matrix col.ab-matrix-col-metric {
@@ -1010,7 +1009,7 @@ body {
 }
 
 .ab-variant-matrix col.ab-matrix-col-variant {
-  width: auto;
+  width: 290px;
 }
 
 .ab-variant-matrix th,

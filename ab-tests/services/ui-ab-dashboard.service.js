@@ -2,6 +2,8 @@ const AB_DASHBOARD_SHEET_ID = "1ot5SxsmAl717cuvQbbXr1dVx1FQ99HTTzN1sG5z_RIc";
 const AB_DASHBOARD_FETCH_TIMEOUT_MS = 32000;
 const AB_FILTER_DATE_FROM_DEFAULT = "2025-01-01";
 const AB_TEST_LIMIT_OPTIONS = Object.freeze([50, 100, 150, 200, 250, 300]);
+const AB_MATRIX_METRIC_COL_WIDTH = 260;
+const AB_MATRIX_VARIANT_COL_WIDTH = 290;
 const AB_DASHBOARD_SOURCE_SHEETS = Object.freeze({
   catalog: "(*) Подложка",
   technical: "(*) Техническая выгрузка",
@@ -1368,6 +1370,7 @@ function renderAbFilterToolbar(model, filteredTests) {
 }
 
 function renderAbTestCard(test) {
+  const matrixWidthPx = AB_MATRIX_METRIC_COL_WIDTH + test.variants.length * AB_MATRIX_VARIANT_COL_WIDTH;
   const reportHtml = test.reportLines.length
     ? `<ul class="ab-tooltip-report-list">${test.reportLines
         .map((line) => `<li>${abEscapeHtml(line.replace(/^[-•]\s*/, ""))}</li>`)
@@ -1488,7 +1491,7 @@ function renderAbTestCard(test) {
     <div class="ab-test-layout">
       <section class="ab-test-center">
         <div class="ab-matrix-wrap">
-          <table class="ab-variant-matrix">
+          <table class="ab-variant-matrix" style="width:${abEscapeAttr(String(matrixWidthPx))}px; min-width:${abEscapeAttr(String(matrixWidthPx))}px;">
             <colgroup>
               <col class="ab-matrix-col-metric" />
               ${test.variants.map(() => '<col class="ab-matrix-col-variant" />').join("")}
