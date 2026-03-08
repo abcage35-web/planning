@@ -59,9 +59,6 @@ const abDashboardStore = {
   promise: null,
   filters: abCreateDefaultFilters(),
   listenersBound: false,
-  renderedFunnelCards: [],
-  funnelChartRefs: [],
-  funnelResizeBound: false,
 };
 
 function getAbDashboardContentEl() {
@@ -1079,152 +1076,6 @@ function abGetFunnelStageStyle(stageKey) {
   return AB_FUNNEL_STAGE_STYLES[stageKey] || { colorFrom: "#6B7280", colorTo: "#9CA3AF" };
 }
 
-function abDisposeCabinetFunnelCharts() {
-  if (!Array.isArray(abDashboardStore.funnelChartRefs)) {
-    abDashboardStore.funnelChartRefs = [];
-    return;
-  }
-  abDashboardStore.funnelChartRefs.forEach((chart) => {
-    if (chart && typeof chart.dispose === "function" && !chart.isDisposed?.()) {
-      chart.dispose();
-    }
-  });
-  abDashboardStore.funnelChartRefs = [];
-}
-
-function abEnsureCabinetFunnelResizeBinding() {
-  if (abDashboardStore.funnelResizeBound) {
-    return;
-  }
-  window.addEventListener("resize", () => {
-    if (!Array.isArray(abDashboardStore.funnelChartRefs)) {
-      return;
-    }
-    abDashboardStore.funnelChartRefs.forEach((chart) => {
-      if (chart && typeof chart.resize === "function") {
-        chart.resize();
-      }
-    });
-  });
-  abDashboardStore.funnelResizeBound = true;
-}
-
-function abCreateCabinetFunnelOption(card) {
-  const echartsApi = window.echarts;
-  const gradientFactory = echartsApi?.graphic?.LinearGradient;
-  const stages = Array.isArray(card?.stages) ? card.stages : [];
-  const maxShapeValue = 100;
-  const minShapeValue = 34;
-  const shapeStep = stages.length > 1 ? (maxShapeValue - minShapeValue) / (stages.length - 1) : 0;
-  const stageData = stages.map((stage, index) => {
-    const style = abGetFunnelStageStyle(stage.key);
-    const color =
-      typeof gradientFactory === "function"
-        ? new gradientFactory(0, 0, 1, 0, [
-            { offset: 0, color: style.colorFrom },
-            { offset: 1, color: style.colorTo },
-          ])
-        : style.colorFrom;
-    const actualCount = Number(stage.count) || 0;
-    const actualPercent = card.total > 0 ? Math.round((actualCount / card.total) * 100) : 0;
-    return {
-      name: stage.label,
-      value: Math.round(maxShapeValue - shapeStep * index),
-      actualCount,
-      actualPercent,
-      itemStyle: {
-        color,
-        borderColor: "rgba(255,255,255,0.96)",
-        borderWidth: 2,
-        shadowBlur: 14,
-        shadowColor: "rgba(31, 55, 67, 0.12)",
-      },
-    };
-  });
-
-  return {
-    animationDuration: 420,
-    animationEasing: "cubicOut",
-    tooltip: {
-      trigger: "item",
-      backgroundColor: "rgba(16, 28, 38, 0.94)",
-      borderColor: "rgba(255,255,255,0.14)",
-      borderWidth: 1,
-      textStyle: {
-        color: "#f5fbff",
-        fontFamily: "IBM Plex Sans, sans-serif",
-        fontSize: 12,
-      },
-      formatter(params) {
-        const actualCount = Number(params?.data?.actualCount) || 0;
-        const actualPercent = Number(params?.data?.actualPercent) || 0;
-        return `${abEscapeHtml(params?.name || "Этап")}<br/>${abEscapeHtml(abFormatInt(actualCount))} из ${abEscapeHtml(
-          abFormatInt(card.total),
-        )}<br/>${abEscapeHtml(String(actualPercent))}%`;
-      },
-    },
-    series: [
-      {
-        type: "funnel",
-        left: "2%",
-        top: 8,
-        bottom: 8,
-        width: "96%",
-        minSize: "34%",
-        maxSize: "100%",
-        sort: "descending",
-        gap: 10,
-        funnelAlign: "center",
-        label: {
-          show: true,
-          position: "inside",
-          color: "#ffffff",
-          fontFamily: "IBM Plex Sans, sans-serif",
-          fontWeight: 700,
-          fontSize: 12,
-          formatter: "{b}",
-        },
-        labelLine: { show: false },
-        itemStyle: {
-          opacity: 0.98,
-          borderJoin: "round",
-        },
-        emphasis: {
-          label: { fontSize: 14 },
-          itemStyle: {
-            shadowBlur: 20,
-            shadowColor: "rgba(31, 55, 67, 0.18)",
-          },
-        },
-        data: stageData,
-      },
-    ],
-  };
-}
-
-function abRenderCabinetFunnelCharts() {
-  abDisposeCabinetFunnelCharts();
-  if (!window.echarts) {
-    return;
-  }
-
-  const cards = Array.isArray(abDashboardStore.renderedFunnelCards) ? abDashboardStore.renderedFunnelCards : [];
-  if (!cards.length) {
-    return;
-  }
-
-  abEnsureCabinetFunnelResizeBinding();
-  cards.forEach((card) => {
-    const chartEl = document.querySelector(`[data-ab-funnel-chart="${card.chartId}"]`);
-    if (!(chartEl instanceof HTMLElement)) {
-      return;
-    }
-    const chart = window.echarts.init(chartEl, null, { renderer: "svg" });
-    chart.setOption(abCreateCabinetFunnelOption(card));
-    abDashboardStore.funnelChartRefs.push(chart);
-  });
-}
-
 function abBuildFunnelMetricRow(label, beforeValue, afterValue, formatter) {
   const before = typeof formatter === "function" ? formatter(beforeValue) : "—";
   const after = typeof formatter === "function" ? formatter(afterValue) : "—";
@@ -1244,7 +1095,6 @@ function abBuildFunnelMetricRow(label, beforeValue, afterValue, formatter) {
 
 function renderAbCabinetFunnelDashboard(filteredTests) {
   const tests = Array.isArray(filteredTests) ? filteredTests : [];
-  abDashboardStore.renderedFunnelCards = [];
   if (!tests.length) {
     return "";
   }
@@ -1254,27 +1104,25 @@ function renderAbCabinetFunnelDashboard(filteredTests) {
     return "";
   }
 
-  const preparedCards = funnelCards.map((card, index) => ({
-    ...card,
-    chartId: `ab-funnel-${index}`,
-  }));
-  abDashboardStore.renderedFunnelCards = preparedCards;
-
-  const cardsHtml = preparedCards
+  const cardsHtml = funnelCards
     .map((card) => {
       const stepsHtml = card.stages
-        .map((stage, index) => {
+        .map((stage) => {
           const style = abGetFunnelStageStyle(stage.key);
           const percent = card.total > 0 ? Math.round((stage.count / card.total) * 100) : 0;
           return `<div class="ab-funnel-stage-row" data-stage="${abEscapeAttr(stage.key)}">
-            <span class="ab-funnel-stage-dot" style="--stage-from:${abEscapeAttr(style.colorFrom)}; --stage-to:${abEscapeAttr(style.colorTo)};"></span>
-            <div class="ab-funnel-stage-copy">
+            <div class="ab-funnel-stage-top">
               <span class="ab-funnel-stage-name">${abEscapeHtml(stage.label)}</span>
-              <span class="ab-funnel-stage-subtle">${abEscapeHtml(abFormatInt(stage.count))} из ${abEscapeHtml(
-                abFormatInt(card.total),
-              )}</span>
+              <span class="ab-funnel-stage-percent">${abEscapeHtml(String(percent))}%</span>
             </div>
-            <span class="ab-funnel-stage-percent">${abEscapeHtml(String(percent))}%</span>
+            <div class="ab-funnel-stage-bar">
+              <span class="ab-funnel-stage-bar-fill" style="--stage-from:${abEscapeAttr(style.colorFrom)}; --stage-to:${abEscapeAttr(
+                style.colorTo,
+              )}; width:${abEscapeAttr(String(percent))}%;"></span>
+            </div>
+            <span class="ab-funnel-stage-subtle">${abEscapeHtml(abFormatInt(stage.count))} из ${abEscapeHtml(
+              abFormatInt(card.total),
+            )}</span>
           </div>`;
         })
         .join("");
@@ -1292,12 +1140,7 @@ function renderAbCabinetFunnelDashboard(filteredTests) {
           </div>
           <span class="ab-status-pill is-good">${abEscapeHtml(String(finalPercent))}%</span>
         </div>
-        <div class="ab-funnel-card-body">
-          <div class="ab-funnel-chart" data-ab-funnel-chart="${abEscapeAttr(card.chartId)}" aria-label="${abEscapeAttr(
-            `Воронка кабинета ${card.cabinet}`,
-          )}"></div>
-          <div class="ab-funnel-stage-list">${stepsHtml}</div>
-        </div>
+        <div class="ab-funnel-stage-list">${stepsHtml}</div>
       </article>`;
     })
     .join("");
@@ -1687,8 +1530,6 @@ function renderAbDashboardContent() {
     return;
   }
 
-  abDisposeCabinetFunnelCharts();
-
   if (abDashboardStore.loading) {
     contentEl.innerHTML = `<div class="ab-tests-state-card">
       <span class="ab-tests-state-spinner" aria-hidden="true"></span>
@@ -1735,7 +1576,6 @@ function renderAbDashboardContent() {
     ${showTests ? renderAbTestsSection(limitedTests) : ""}
     ${showProducts ? renderAbProductsSection(filteredProducts) : ""}
   `;
-  abRenderCabinetFunnelCharts();
 }
 
 function bindAbDashboardEvents() {
