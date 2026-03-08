@@ -1068,13 +1068,16 @@ body {
 
 .ab-variant-matrix tbody tr.is-image td {
   text-align: center;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .ab-image-cell {
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-width: 100%;
+  display: grid;
+  place-items: center;
+  justify-items: center;
 }
 
 .ab-variant-install-time {
@@ -1144,6 +1147,7 @@ body {
   position: relative;
   display: inline-flex;
   margin-inline: auto;
+  justify-self: center;
 }
 
 .ab-cover-frame.is-best {
@@ -1194,6 +1198,7 @@ body {
   width: 84px;
   max-width: 100%;
   aspect-ratio: 3 / 4;
+  margin-inline: auto;
   border-radius: 9px;
   border: 1px dashed rgba(22, 56, 71, 0.3);
   color: #6a818d;
