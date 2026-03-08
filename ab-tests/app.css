@@ -403,7 +403,7 @@ body {
 
 .ab-toolbar-main {
   display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) repeat(4, minmax(150px, 0.48fr)) auto;
+  grid-template-columns: minmax(220px, 1.15fr) repeat(5, minmax(132px, 0.42fr)) auto;
   gap: 8px;
   align-items: center;
 }

@@ -1,6 +1,7 @@
 const AB_DASHBOARD_SHEET_ID = "1ot5SxsmAl717cuvQbbXr1dVx1FQ99HTTzN1sG5z_RIc";
 const AB_DASHBOARD_FETCH_TIMEOUT_MS = 32000;
 const AB_FILTER_DATE_FROM_DEFAULT = "2025-01-01";
+const AB_TEST_LIMIT_OPTIONS = Object.freeze([50, 100, 150, 200, 250, 300]);
 const AB_DASHBOARD_SOURCE_SHEETS = Object.freeze({
   catalog: "(*) Подложка",
   technical: "(*) Техническая выгрузка",
@@ -34,6 +35,7 @@ function abCreateDefaultFilters() {
     search: "",
     cabinet: "all",
     verdict: "all",
+    limit: String(AB_TEST_LIMIT_OPTIONS[0]),
     dateFrom: AB_FILTER_DATE_FROM_DEFAULT,
     dateTo: abGetTodayDateInputValue(),
     view: "tests",
@@ -1122,9 +1124,17 @@ function renderAbFilterToolbar(model, filteredTests) {
       ),
     )
     .join("");
+  const limitOptions = AB_TEST_LIMIT_OPTIONS.map(
+    (value) =>
+      `<option value="${abEscapeAttr(String(value))}"${String(abDashboardStore.filters.limit) === String(value) ? " selected" : ""}>${abEscapeHtml(
+        String(value),
+      )}</option>`,
+  ).join("");
 
   const totalTests = Array.isArray(model?.tests) ? model.tests.length : 0;
   const visibleTests = Array.isArray(filteredTests) ? filteredTests.length : 0;
+  const testLimit = Math.max(1, Number(abDashboardStore.filters.limit) || AB_TEST_LIMIT_OPTIONS[0]);
+  const shownTests = Math.min(visibleTests, testLimit);
   const filteredGood = filteredTests.filter((test) => test?.finalStatusKind === "good").length;
   const filteredBad = filteredTests.filter((test) => test?.finalStatusKind === "bad").length;
 
@@ -1156,6 +1166,9 @@ function renderAbFilterToolbar(model, filteredTests) {
       <label class="ab-toolbar-field is-date">
         <input type="date" value="${abEscapeAttr(abDashboardStore.filters.dateTo)}" data-ab-filter="dateTo" />
       </label>
+      <label class="ab-toolbar-field">
+        <select data-ab-filter="limit">${limitOptions}</select>
+      </label>
       <div class="ab-toolbar-actions">
         <div class="ab-view-switch" role="tablist" aria-label="Режим просмотра AB">
           <button type="button" class="ab-view-btn${abDashboardStore.filters.view === "tests" ? " is-active" : ""}" data-ab-view="tests">По тестам</button>
@@ -1166,7 +1179,8 @@ function renderAbFilterToolbar(model, filteredTests) {
       </div>
     </div>
     <div class="ab-toolbar-stats">
-      <span class="ab-stat-chip">Тестов: <strong>${abEscapeHtml(abFormatInt(visibleTests))}</strong> / ${abEscapeHtml(abFormatInt(totalTests))}</span>
+      <span class="ab-stat-chip">Показано: <strong>${abEscapeHtml(abFormatInt(shownTests))}</strong> / ${abEscapeHtml(abFormatInt(visibleTests))}</span>
+      <span class="ab-stat-chip">Всего тестов: <strong>${abEscapeHtml(abFormatInt(totalTests))}</strong></span>
       <span class="ab-stat-chip">Хорошо: <strong>${abEscapeHtml(abFormatInt(filteredGood))}</strong></span>
       <span class="ab-stat-chip">Плохо: <strong>${abEscapeHtml(abFormatInt(filteredBad))}</strong></span>
     </div>
@@ -1507,6 +1521,8 @@ function renderAbDashboardContent() {
   }
 
   const filteredTests = abFilterTests(model);
+  const testLimit = Math.max(1, Number(abDashboardStore.filters.limit) || AB_TEST_LIMIT_OPTIONS[0]);
+  const limitedTests = filteredTests.slice(0, testLimit);
   const filteredProducts = abBuildProductsFromFilteredTests(filteredTests);
 
   const sourceRowsLabel = `Строк в подложке: ${abFormatInt(model.rowCounts.catalog)} · строк в техвыгрузке: ${abFormatInt(
@@ -1520,7 +1536,7 @@ function renderAbDashboardContent() {
     ${renderAbFilterToolbar(model, filteredTests)}
     <div class="ab-source-line">${abEscapeHtml(sourceRowsLabel)}</div>
     ${renderAbCabinetFunnelDashboard(filteredTests)}
-    ${showTests ? renderAbTestsSection(filteredTests) : ""}
+    ${showTests ? renderAbTestsSection(limitedTests) : ""}
     ${showProducts ? renderAbProductsSection(filteredProducts) : ""}
   `;
 }
@@ -1561,9 +1577,10 @@ function bindAbDashboardEvents() {
       return;
     }
 
-    if (filterName === "cabinet" || filterName === "verdict") {
+    if (filterName === "cabinet" || filterName === "verdict" || filterName === "limit") {
       if (target instanceof HTMLSelectElement) {
-        abDashboardStore.filters[filterName] = target.value || "all";
+        abDashboardStore.filters[filterName] =
+          filterName === "limit" ? String(target.value || AB_TEST_LIMIT_OPTIONS[0]) : target.value || "all";
         renderAbDashboardContent();
       }
       return;
