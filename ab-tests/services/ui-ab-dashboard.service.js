@@ -573,6 +573,44 @@ function abResolvePriceDecisionRaw(priceBeforeDelta, priceDuringDelta, priceAfte
   return deltas.every((value) => Math.abs(value) <= 0.06) ? "WIN" : "LOOSE";
 }
 
+function abBuildPriceDeltaMetrics(priceBefore, priceDuring, priceAfter) {
+  const prices = [priceBefore, priceDuring, priceAfter].filter((value) => Number.isFinite(value));
+  if (!prices.length) {
+    return {
+      priceDeltaBefore: null,
+      priceDeltaDuring: null,
+      priceDeltaAfter: null,
+      minPriceDelta: null,
+      maxPriceDelta: null,
+    };
+  }
+
+  const averagePrice = prices.reduce((sum, value) => sum + value, 0) / prices.length;
+  if (!Number.isFinite(averagePrice) || averagePrice === 0) {
+    return {
+      priceDeltaBefore: null,
+      priceDeltaDuring: null,
+      priceDeltaAfter: null,
+      minPriceDelta: null,
+      maxPriceDelta: null,
+    };
+  }
+
+  const normalizeDelta = (value) => (Number.isFinite(value) ? value / averagePrice - 1 : null);
+  const priceDeltaBefore = normalizeDelta(priceBefore);
+  const priceDeltaDuring = normalizeDelta(priceDuring);
+  const priceDeltaAfter = normalizeDelta(priceAfter);
+  const preparedDeltas = [priceDeltaBefore, priceDeltaDuring, priceDeltaAfter].filter((value) => Number.isFinite(value));
+
+  return {
+    priceDeltaBefore,
+    priceDeltaDuring,
+    priceDeltaAfter,
+    minPriceDelta: preparedDeltas.length ? Math.min(...preparedDeltas) : null,
+    maxPriceDelta: preparedDeltas.length ? Math.max(...preparedDeltas) : null,
+  };
+}
+
 function abResolveOverallDecisionRaw(decisions) {
   const prepared = (Array.isArray(decisions) ? decisions : []).map((item) => String(item || "").trim().toUpperCase());
   if (!prepared.length || prepared.some((item) => !item || item === "?")) {
@@ -696,17 +734,16 @@ function abBuildComputedMetricsBlock(sourceRow, variants) {
   const priceBefore = abToNumber(abCellRaw(sourceRow, "AU"));
   const priceDuring = abToNumber(abCellRaw(sourceRow, "AV"));
   const priceAfter = abToNumber(abCellRaw(sourceRow, "AW"));
-  const priceDeltaBefore = abToNumber(abCellRaw(sourceRow, "Z"));
-  const priceDeltaDuring = abToNumber(abCellRaw(sourceRow, "AA"));
-  const priceDeltaAfter = abToNumber(abCellRaw(sourceRow, "AB"));
+  const { priceDeltaBefore, priceDeltaDuring, priceDeltaAfter, minPriceDelta, maxPriceDelta } = abBuildPriceDeltaMetrics(
+    priceBefore,
+    priceDuring,
+    priceAfter,
+  );
 
   const priceDecisionRaw = abResolvePriceDecisionRaw(priceDeltaBefore, priceDeltaDuring, priceDeltaAfter);
   const ctrDecisionRaw = abResolveCtrDecisionRaw(boostCtr);
   const ctrCr1DecisionRaw = abResolveCtrCr1DecisionRaw(boostCtrCr1);
   const overallDecisionRaw = abResolveOverallDecisionRaw([ctrDecisionRaw, priceDecisionRaw, ctrCr1DecisionRaw]);
-  const priceDeltas = [priceDeltaBefore, priceDeltaDuring, priceDeltaAfter].filter((value) => Number.isFinite(value));
-  const minPriceDelta = priceDeltas.length ? Math.min(...priceDeltas) : null;
-  const maxPriceDelta = priceDeltas.length ? Math.max(...priceDeltas) : null;
 
   return {
     oldCtr,
