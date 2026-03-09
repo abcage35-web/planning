@@ -690,13 +690,21 @@ body {
 }
 
 .ab-test-summary-row {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
-  gap: 5px;
+  gap: 8px;
   width: fit-content;
   max-width: 100%;
   margin-left: auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(22, 56, 71, 0.14);
+  background: linear-gradient(180deg, rgba(252, 254, 255, 0.96) 0%, rgba(245, 250, 253, 0.94) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.94),
+    0 10px 24px rgba(20, 46, 58, 0.05);
 }
 
 .ab-test-meta-row {
@@ -777,14 +785,12 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(360px, 0.78fr);
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .ab-test-right {
-  display: grid;
-  gap: 6px;
-  align-content: start;
-  grid-template-rows: auto auto;
+  min-width: 0;
+  display: flex;
 }
 
 .ab-checks-grid {
@@ -830,6 +836,30 @@ body {
   font-size: 10px;
 }
 
+.ab-eval-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 3px 5px 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(22, 56, 71, 0.12);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.ab-eval-step-title {
+  color: #294553;
+  font: 700 12px/1 "IBM Plex Sans", sans-serif;
+  white-space: nowrap;
+}
+
+.ab-eval-step-separator {
+  color: #69818e;
+  font: 700 18px/1 "IBM Plex Sans", sans-serif;
+  transform: translateY(-1px);
+}
+
 .ab-metrics-card,
 .ab-side-card {
   border: 1px solid rgba(22, 56, 71, 0.15);
@@ -839,7 +869,8 @@ body {
 }
 
 .ab-side-card {
-  height: auto;
+  width: 100%;
+  height: 100%;
   display: grid;
   align-content: start;
 }
@@ -1054,13 +1085,14 @@ body {
 .ab-test-center {
   min-width: 0;
   display: flex;
+  align-self: stretch;
 }
 
 .ab-matrix-wrap {
   width: 100%;
-  height: auto;
+  height: 100%;
   display: flex;
-  align-self: start;
+  align-self: stretch;
   overflow: auto;
   border: 1px solid rgba(22, 56, 71, 0.16);
   border-radius: 10px;

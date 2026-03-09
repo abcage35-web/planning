@@ -1277,9 +1277,16 @@ function renderAbTestCard(test) {
     { label: "3. CTR x CR1", raw: test.summaryChecks.testCtrCr1 },
     { label: "4. Итог", raw: test.summaryChecks.overall },
   ]
-    .map(
-      (item) => `<div class="ab-check-pill is-inline"><span>${abEscapeHtml(item.label)}</span>${abStatusPill(item.raw, true)}</div>`,
-    )
+    .map((item, index, list) => {
+      const stepHtml = `<div class="ab-eval-step">
+        <span class="ab-eval-step-title">${abEscapeHtml(item.label)}</span>
+        ${abStatusPill(item.raw, true)}
+      </div>`;
+      if (index === list.length - 1) {
+        return stepHtml;
+      }
+      return `${stepHtml}<span class="ab-eval-step-separator" aria-hidden="true">→</span>`;
+    })
     .join("");
 
   const variantsHeaderCells = test.variants
