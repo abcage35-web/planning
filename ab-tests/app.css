@@ -1110,15 +1110,15 @@ body {
 .ab-image-cell {
   width: 100%;
   min-width: 0;
-  display: flex;
-  justify-content: center;
+  display: block;
+  text-align: center;
 }
 
 .ab-image-center {
   width: 100%;
   min-height: 1px;
-  display: flex;
-  justify-content: center;
+  display: block;
+  text-align: center;
 }
 
 .ab-variant-install-time {
@@ -1188,7 +1188,6 @@ body {
 .ab-cover-frame {
   position: relative;
   display: inline-flex;
-  margin-inline: auto;
   transform-origin: center center;
   transition:
     filter 0.18s ease;
