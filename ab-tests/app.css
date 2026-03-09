@@ -251,9 +251,9 @@ body {
   border: 1px solid rgba(22, 56, 71, 0.16);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.9);
-  padding: 10px;
+  padding: 8px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .ab-funnel-dashboard-head {
@@ -264,29 +264,31 @@ body {
 }
 
 .ab-funnel-dashboard-head h3 {
-  margin: 0 0 4px;
+  margin: 0 0 3px;
   color: #203945;
-  font: 700 18px/1.15 "IBM Plex Sans", sans-serif;
+  font: 700 16px/1.1 "IBM Plex Sans", sans-serif;
 }
 
 .ab-funnel-dashboard-head .subtle {
   margin: 0;
   max-width: 780px;
+  font-size: 12px;
+  line-height: 1.3;
 }
 
 .ab-funnel-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 8px;
 }
 
 .ab-funnel-card {
   border: 1px solid rgba(22, 56, 71, 0.15);
   border-radius: 12px;
   background: rgba(241, 248, 251, 0.76);
-  padding: 10px;
+  padding: 8px;
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .ab-funnel-card-head {
@@ -299,36 +301,54 @@ body {
 .ab-funnel-card-head h4 {
   margin: 0;
   color: #1f3b49;
-  font: 700 18px/1.1 "IBM Plex Sans", sans-serif;
+  font: 700 15px/1.05 "IBM Plex Sans", sans-serif;
 }
 
 .ab-funnel-card-subtle {
-  margin-top: 4px;
+  margin-top: 2px;
   color: #58707d;
-  font: 600 12px/1.3 "IBM Plex Sans", sans-serif;
+  font: 600 11px/1.25 "IBM Plex Sans", sans-serif;
 }
 
 .ab-funnel-stage-list {
   display: grid;
-  gap: 8px;
+  gap: 5px;
 }
 
 .ab-funnel-stage-row {
   display: grid;
-  gap: 6px;
-  padding: 8px 10px;
+  gap: 4px;
+  padding: 6px 8px;
   border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
   transition:
     background-color 0.18s ease,
+    border-color 0.18s ease,
     box-shadow 0.18s ease,
     transform 0.18s ease;
 }
 
 .ab-funnel-stage-row:hover,
-.ab-funnel-stage-row:focus-within {
+.ab-funnel-stage-row:focus-visible {
   background: rgba(255, 255, 255, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(22, 56, 71, 0.08);
+  border-color: rgba(22, 56, 71, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(22, 56, 71, 0.05);
   transform: translateY(-1px);
+  outline: none;
+}
+
+.ab-funnel-stage-row.is-active {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(0, 117, 143, 0.22);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 117, 143, 0.08),
+    0 6px 14px rgba(14, 39, 48, 0.05);
 }
 
 .ab-funnel-stage-top {
@@ -340,13 +360,13 @@ body {
 
 .ab-funnel-stage-name {
   color: #375462;
-  font: 700 12px/1.2 "IBM Plex Sans", sans-serif;
+  font: 700 11px/1.15 "IBM Plex Sans", sans-serif;
 }
 
 .ab-funnel-stage-bar {
   position: relative;
   width: 100%;
-  height: 10px;
+  height: 8px;
   border-radius: 999px;
   overflow: hidden;
   background: rgba(214, 226, 233, 0.92);
@@ -365,12 +385,12 @@ body {
 
 .ab-funnel-stage-subtle {
   color: #6a828e;
-  font: 600 11px/1.2 "IBM Plex Sans", sans-serif;
+  font: 600 10px/1.15 "IBM Plex Sans", sans-serif;
 }
 
 .ab-funnel-stage-percent {
   color: #203846;
-  font: 700 12px/1.2 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font: 700 11px/1.15 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
 }
 
 .ab-table-empty-row {
