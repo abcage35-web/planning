@@ -1362,36 +1362,40 @@ function renderAbTestCard(test) {
   return `<article class="ab-test-card" data-test-id="${abEscapeAttr(test.testId)}">
     <header class="ab-test-head">
       <div class="ab-test-head-main">
-        <h4>Тест ${abEscapeHtml(test.testId)}</h4>
+        <div class="ab-test-head-top">
+          <h4>Тест ${abEscapeHtml(test.testId)}</h4>
+          <div class="ab-test-meta-row">
+            <span class="ab-test-chip">Артикул: <strong>${abEscapeHtml(test.article || "—")}</strong></span>
+            <span class="ab-test-chip">Тип РК: <strong>${abEscapeHtml(test.type || "—")}</strong></span>
+            <span class="ab-test-chip">Кабинет: <strong>${abEscapeHtml(test.cabinet || "—")}</strong></span>
+          </div>
+        </div>
         <p class="ab-test-title" title="${abEscapeAttr(test.title)}">${abEscapeHtml(test.title || "—")}</p>
         <p class="ab-test-period">${abEscapeHtml(testPeriodText)}</p>
-        <div class="ab-test-summary-row">${checksHtml}</div>
-        <div class="ab-test-meta-row">
-          <span class="ab-test-chip">Артикул: <strong>${abEscapeHtml(test.article || "—")}</strong></span>
-          <span class="ab-test-chip">Тип РК: <strong>${abEscapeHtml(test.type || "—")}</strong></span>
-          <span class="ab-test-chip">Кабинет: <strong>${abEscapeHtml(test.cabinet || "—")}</strong></span>
-        </div>
       </div>
-      <div class="ab-test-head-actions">
-        <div class="ab-tooltip-anchor">
-          <button type="button" class="ab-icon-btn" aria-label="Показать отчет по расчетам">
-            ${abRenderIcon("info", "ab-card-help-icon") || "i"}
-          </button>
-          <div class="ab-hover-tooltip" role="tooltip">
-            <div class="ab-hover-tooltip-title">Отчет по расчетам</div>
-            ${reportHtml}
+      <div class="ab-test-head-side">
+        <div class="ab-test-head-actions">
+          <div class="ab-tooltip-anchor">
+            <button type="button" class="ab-icon-btn" aria-label="Показать отчет по расчетам">
+              ${abRenderIcon("info", "ab-card-help-icon") || "i"}
+            </button>
+            <div class="ab-hover-tooltip" role="tooltip">
+              <div class="ab-hover-tooltip-title">Отчет по расчетам</div>
+              ${reportHtml}
+            </div>
           </div>
-        </div>
-        <div class="ab-tooltip-anchor">
-          <button type="button" class="ab-icon-btn" aria-label="Показать данные по цене">
-            ${abRenderIcon("info", "ab-card-help-icon") || "i"}
-          </button>
-          <div class="ab-hover-tooltip ab-hover-tooltip-price" role="tooltip">
-            ${priceTooltipHtml}
+          <div class="ab-tooltip-anchor">
+            <button type="button" class="ab-icon-btn" aria-label="Показать данные по цене">
+              ${abRenderIcon("info", "ab-card-help-icon") || "i"}
+            </button>
+            <div class="ab-hover-tooltip ab-hover-tooltip-price" role="tooltip">
+              ${priceTooltipHtml}
+            </div>
           </div>
+          ${abSafeLink(test.xwayUrl, "XWay")}
+          ${abSafeLink(test.wbUrl, "WB")}
         </div>
-        ${abSafeLink(test.xwayUrl, "XWay")}
-        ${abSafeLink(test.wbUrl, "WB")}
+        <div class="ab-test-summary-row">${checksHtml}</div>
       </div>
     </header>
 

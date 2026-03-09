@@ -617,9 +617,9 @@ body {
 }
 
 .ab-test-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 10px;
 }
 
@@ -627,6 +627,13 @@ body {
   min-width: 0;
   display: grid;
   gap: 3px;
+}
+
+.ab-test-head-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
 }
 
 .ab-test-head h4 {
@@ -650,6 +657,7 @@ body {
 .ab-test-summary-row {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
   padding: 6px;
   border-radius: 14px;
@@ -659,10 +667,13 @@ body {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.92),
     0 8px 22px rgba(17, 42, 54, 0.06);
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
 }
 
 .ab-test-meta-row {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
   gap: 6px;
 }
@@ -686,6 +697,14 @@ body {
   gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.ab-test-head-side {
+  min-width: 0;
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 6px;
 }
 
 .ab-status-pill {
@@ -1421,12 +1440,26 @@ body {
   }
 
   .ab-test-head {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     align-items: stretch;
+  }
+
+  .ab-test-head-top {
+    align-items: flex-start;
   }
 
   .ab-test-head-actions {
     justify-content: flex-start;
+  }
+
+  .ab-test-head-side {
+    justify-items: start;
+  }
+
+  .ab-test-summary-row {
+    justify-content: flex-start;
+    width: 100%;
+    margin-left: 0;
   }
 
   .ab-cover-link,
