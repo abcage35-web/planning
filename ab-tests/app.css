@@ -1094,11 +1094,10 @@ body {
 
 .ab-image-cell {
   display: flex;
-  width: max-content;
-  max-width: 100%;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   justify-content: center;
-  margin-inline: auto;
 }
 
 .ab-variant-install-time {
