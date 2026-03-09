@@ -1272,13 +1272,14 @@ function renderAbTestCard(test) {
     : '<div class="ab-tooltip-report-empty">Без текстового отчета.</div>';
 
   const checksHtml = [
-    { label: "1. CTR", raw: test.summaryChecks.testCtr },
-    { label: "2. Цена", raw: test.summaryChecks.testPrice },
-    { label: "3. CTR x CR1", raw: test.summaryChecks.testCtrCr1 },
-    { label: "4. Итог", raw: test.summaryChecks.overall },
+    { index: "1", label: "CTR", raw: test.summaryChecks.testCtr },
+    { index: "2", label: "Цена", raw: test.summaryChecks.testPrice },
+    { index: "3", label: "CTR x CR1", raw: test.summaryChecks.testCtrCr1 },
+    { index: "4", label: "Итог", raw: test.summaryChecks.overall },
   ]
     .map((item, index, list) => {
       const stepHtml = `<div class="ab-eval-step">
+        <span class="ab-eval-step-index">${abEscapeHtml(item.index)}</span>
         <span class="ab-eval-step-title">${abEscapeHtml(item.label)}</span>
         ${abStatusPill(item.raw, true)}
       </div>`;
