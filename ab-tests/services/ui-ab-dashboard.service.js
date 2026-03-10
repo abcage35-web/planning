@@ -1,13 +1,13 @@
-const AB_DASHBOARD_SHEET_ID = "1ot5SxsmAl717cuvQbbXr1dVx1FQ99HTTzN1sG5z_RIc";
+const AB_DASHBOARD_SHEET_ID = "1FS-XeiQA5IIB420mDAUlEGW09HoZWU0Sqtpk6i1jcEQ";
 const AB_DASHBOARD_FETCH_TIMEOUT_MS = 32000;
 const AB_FILTER_DATE_FROM_DEFAULT = "2025-01-01";
 const AB_TEST_LIMIT_OPTIONS = Object.freeze([50, 100, 150, 200, 250, 300]);
-const AB_MATRIX_METRIC_COL_WIDTH = 138;
-const AB_MATRIX_VARIANT_COL_WIDTH = 118;
+const AB_MATRIX_METRIC_COL_WIDTH = 160;
+const AB_MATRIX_VARIANT_COL_WIDTH = 112;
 const AB_DASHBOARD_SOURCE_SHEETS = Object.freeze({
-  catalog: "(*) Подложка",
-  technical: "(*) Техническая выгрузка",
-  results: "(*) Результаты по обложкам XWAY",
+  catalog: { gid: "795894762", label: "Каталог товаров" },
+  technical: { gid: "763001257", label: "AB-выгрузка" },
+  results: { gid: "185346508", label: "Результаты обложек" },
 });
 const AB_STATUS_MAP = Object.freeze({
   WIN: "good",
@@ -389,9 +389,21 @@ async function abFetchWithTimeout(url, timeoutMs) {
   }
 }
 
-async function fetchAbSheetRaw(sheetName) {
+function abBuildSourceMetaText(fetchedLabel = "") {
+  const labels = Object.values(AB_DASHBOARD_SOURCE_SHEETS)
+    .map((item) => String(item?.label || "").trim())
+    .filter(Boolean)
+    .join(", ");
+  return `Источники: таблица «Тесты CTR» · ${labels}.${fetchedLabel ? ` Обновлено: ${fetchedLabel}` : ""}`;
+}
+
+async function fetchAbSheetRaw(sheetConfig) {
+  const gid = String(sheetConfig?.gid || "").trim();
+  if (!gid) {
+    throw new Error("Не задан gid листа Google Sheets.");
+  }
   const url = new URL(`https://docs.google.com/spreadsheets/d/${AB_DASHBOARD_SHEET_ID}/gviz/tq`);
-  url.searchParams.set("sheet", sheetName);
+  url.searchParams.set("gid", gid);
   url.searchParams.set("tqx", "out:json");
   const responseText = await abFetchWithTimeout(url.toString(), AB_DASHBOARD_FETCH_TIMEOUT_MS);
   const table = abParseGvizResponse(responseText);
@@ -897,7 +909,9 @@ function abBuildComputedTestCard(sourceRow, resultsByTest, catalogIndex) {
       overall: metricsBlock.overallDecisionRaw,
     },
     variants,
-    priceDeviationCount: abFormatInt(abToNumber(abCellRaw(sourceRow, "Y"))),
+    priceDeviationCount: abFormatInt(
+      abCountPriceTransitions(metricsBlock.priceBefore, metricsBlock.priceDuring, metricsBlock.priceAfter),
+    ),
     comparisonRows,
     reportLines,
     reportText: reportLines.join("\n"),
@@ -1139,6 +1153,20 @@ function abBuildTimelineMetricRow(label, beforeValue, duringValue, afterValue, f
   };
 }
 
+function abCountPriceTransitions(...valuesRaw) {
+  const values = valuesRaw.filter((value) => Number.isFinite(value));
+  if (values.length < 2) {
+    return 0;
+  }
+  let changes = 0;
+  for (let index = 1; index < values.length; index += 1) {
+    if (Math.abs(Number(values[index]) - Number(values[index - 1])) > 0.0001) {
+      changes += 1;
+    }
+  }
+  return changes;
+}
+
 function renderAbCabinetFunnelDashboard(filteredTests) {
   const tests = Array.isArray(filteredTests) ? filteredTests : [];
   if (!tests.length) {
@@ -1165,10 +1193,9 @@ function renderAbCabinetFunnelDashboard(filteredTests) {
           )}">
             <div class="ab-funnel-stage-top">
               <span class="ab-funnel-stage-name">${abEscapeHtml(stage.label)}</span>
-              <span class="ab-funnel-stage-count">${abEscapeHtml(abFormatInt(stage.count))} из ${abEscapeHtml(
+              <span class="ab-funnel-stage-meta">${abEscapeHtml(abFormatInt(stage.count))} / ${abEscapeHtml(
                 abFormatInt(card.total),
-              )}</span>
-              <span class="ab-funnel-stage-percent">${abEscapeHtml(String(percent))}%</span>
+              )} · ${abEscapeHtml(String(percent))}%</span>
             </div>
             <div class="ab-funnel-stage-bar">
               <span class="ab-funnel-stage-bar-fill" style="--stage-from:${abEscapeAttr(style.colorFrom)}; --stage-to:${abEscapeAttr(
@@ -1603,7 +1630,7 @@ function renderAbDashboardContent() {
 
   if (metaEl) {
     const fetchedLabel = abDashboardStore.fetchedAt ? formatDateTime(abDashboardStore.fetchedAt) : "-";
-    metaEl.textContent = `Источники: (*) Подложка, (*) Техническая выгрузка, (*) Результаты по обложкам XWAY. Обновлено: ${fetchedLabel}`;
+    metaEl.textContent = abBuildSourceMetaText(fetchedLabel);
   }
 
   const filteredTests = abFilterTests(model);
