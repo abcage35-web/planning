@@ -1,3 +1,5 @@
+import { XWAY_FALLBACK_STORAGE_STATE } from "./xway-storage-state.js";
+
 const XWAY_BASE_URL = "https://am.xway.ru";
 const XWAY_AB_TESTS_REFERER = `${XWAY_BASE_URL}/wb/ab-tests`;
 
@@ -23,6 +25,10 @@ export function getXwayStorageState(env) {
     } catch {
       return null;
     }
+  }
+
+  if (Array.isArray(XWAY_FALLBACK_STORAGE_STATE?.cookies) && XWAY_FALLBACK_STORAGE_STATE.cookies.length > 0) {
+    return XWAY_FALLBACK_STORAGE_STATE;
   }
 
   return null;
