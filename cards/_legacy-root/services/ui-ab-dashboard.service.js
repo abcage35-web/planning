@@ -1,8 +1,8 @@
-const AB_DASHBOARD_SHEET_ID = "1ot5SxsmAl717cuvQbbXr1dVx1FQ99HTTzN1sG5z_RIc";
+const AB_DASHBOARD_SHEET_ID = "ARCHIVED_LEGACY_SOURCE_REMOVED";
 const AB_DASHBOARD_FETCH_TIMEOUT_MS = 32000;
 const AB_DASHBOARD_SHEETS = Object.freeze({
-  summary: "[WB] Сводка : тесты CTR",
-  results: "(*) Результаты по обложкам XWAY",
+  summary: "ARCHIVED_LEGACY_SOURCE_REMOVED",
+  results: "ARCHIVED_LEGACY_SOURCE_REMOVED",
 });
 const AB_VARIANT_COLS = Object.freeze(["Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF", "AG", "AH"]);
 const AB_STATUS_MAP = Object.freeze({
@@ -849,7 +849,7 @@ function renderAbOverview(model) {
   return `<article class="ab-overview-card">
     <div class="ab-overview-head">
       <h3>Сводка (как в листе)</h3>
-      <span class="subtle">Формулы и значения берутся из вкладки «[WB] Сводка : тесты CTR»</span>
+      <span class="subtle">Архивный legacy‑модуль. Актуальные источники AB‑данных вынесены в проект ab-tests.</span>
     </div>
     <div class="ab-overview-table-wrap">
       <table class="ab-overview-table">
@@ -1191,7 +1191,7 @@ function renderAbDashboardContent() {
   if (abDashboardStore.loading) {
     contentEl.innerHTML = `<div class="ab-tests-state-card">
       <span class="ab-tests-state-spinner" aria-hidden="true"></span>
-      <span>Загружаю данные из «[WB] Сводка : тесты CTR»…</span>
+      <span>Загружаю архивный legacy‑слепок AB‑данных…</span>
     </div>`;
     return;
   }
@@ -1212,7 +1212,7 @@ function renderAbDashboardContent() {
 
   if (metaEl) {
     const fetchedLabel = abDashboardStore.fetchedAt ? formatDateTime(abDashboardStore.fetchedAt) : "-";
-    metaEl.textContent = `Источник формул: [WB] Сводка : тесты CTR. Медиа: (*) Результаты по обложкам XWAY. Обновлено: ${fetchedLabel}`;
+    metaEl.textContent = `Архивный legacy‑модуль AB‑данных. Обновлено: ${fetchedLabel}`;
   }
 
   const filteredTests = abFilterTests(model);
