@@ -2,7 +2,7 @@ const AB_DASHBOARD_SHEET_ID = "1FS-XeiQA5IIB420mDAUlEGW09HoZWU0Sqtpk6i1jcEQ";
 const AB_DASHBOARD_FETCH_TIMEOUT_MS = 32000;
 const AB_FILTER_DATE_FROM_DEFAULT = "2025-01-01";
 const AB_TEST_LIMIT_OPTIONS = Object.freeze([50, 100, 150, 200, 250, 300]);
-const AB_MATRIX_METRIC_COL_WIDTH = 160;
+const AB_MATRIX_METRIC_COL_WIDTH = 136;
 const AB_MATRIX_VARIANT_COL_WIDTH = 112;
 const AB_DASHBOARD_SOURCE_SHEETS = Object.freeze({
   catalog: { gid: "795894762", label: "Каталог товаров" },
@@ -1193,9 +1193,10 @@ function renderAbCabinetFunnelDashboard(filteredTests) {
           )}">
             <div class="ab-funnel-stage-top">
               <span class="ab-funnel-stage-name">${abEscapeHtml(stage.label)}</span>
-              <span class="ab-funnel-stage-meta">${abEscapeHtml(abFormatInt(stage.count))} / ${abEscapeHtml(
+              <span class="ab-funnel-stage-percent">${abEscapeHtml(String(percent))}%</span>
+              <span class="ab-funnel-stage-count">${abEscapeHtml(abFormatInt(stage.count))} из ${abEscapeHtml(
                 abFormatInt(card.total),
-              )} · ${abEscapeHtml(String(percent))}%</span>
+              )}</span>
             </div>
             <div class="ab-funnel-stage-bar">
               <span class="ab-funnel-stage-bar-fill" style="--stage-from:${abEscapeAttr(style.colorFrom)}; --stage-to:${abEscapeAttr(
@@ -1398,7 +1399,7 @@ function renderAbTestCard(test) {
       <td>${
         row.deltaText !== "—"
           ? `<span class="ab-delta-pill is-${abEscapeAttr(row.deltaKind)}">${abEscapeHtml(row.deltaText)}</span>`
-          : '<span class="ab-delta-pill is-unknown">—</span>'
+          : "—"
       }</td>
     </tr>`,
     )
@@ -1429,6 +1430,19 @@ function renderAbTestCard(test) {
               ${reportHtml}
             </div>
           </div>
+          <button
+            type="button"
+            class="ab-icon-btn ab-head-action-btn"
+            data-ab-action="open-xway-metrics"
+            data-ab-test-id="${abEscapeAttr(test.testId)}"
+            data-ab-campaign-type="${abEscapeAttr(test.type || "")}"
+            data-ab-started-at="${abEscapeAttr(test.startedAtIso || "")}"
+            data-ab-ended-at="${abEscapeAttr(test.endedAtIso || "")}"
+            aria-label="Показать конверсии XWAY по типу РК"
+            title="Показать конверсии XWAY по типу РК"
+          >
+            ${abRenderIcon("barChart", "ab-card-help-icon") || "X"}
+          </button>
           ${abSafeLink(test.xwayUrl, "XWay")}
           ${abSafeLink(test.wbUrl, "WB")}
         </div>
@@ -1484,7 +1498,20 @@ function renderAbTestCard(test) {
         <article class="ab-side-card">
           <div class="ab-card-head">
             <h5>Метрики ДО / ВО ВРЕМЯ / ПОСЛЕ</h5>
-            <span class="ab-side-card-note">Откл. цены: <strong>${abEscapeHtml(test.priceDeviationCount || "—")}</strong></span>
+            <div class="ab-tooltip-anchor">
+              <button
+                type="button"
+                class="ab-icon-btn ab-head-action-btn"
+                aria-label="Показать информацию по отклонениям цены"
+                title="Показать информацию по отклонениям цены"
+              >
+                ${abRenderIcon("info", "ab-card-help-icon") || "i"}
+              </button>
+              <div class="ab-hover-tooltip" role="tooltip">
+                <div class="ab-hover-tooltip-title">Отклонения цены</div>
+                <div class="ab-tooltip-report-empty">Количество отклонений цены: ${abEscapeHtml(test.priceDeviationCount || "—")}</div>
+              </div>
+            </div>
           </div>
           <table class="ab-mini-table is-tight">
             <thead>

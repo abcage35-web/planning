@@ -7,6 +7,8 @@ function renderIcon(name, className = "") {
       return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`;
     case "info":
       return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v6"/><path d="M12 7.5h.01"/></svg>`;
+    case "barChart":
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20v-12"/></svg>`;
     case "externalLink":
       return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M20 14v5a1 1 0 0 1-1 1h-14a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1h5"/></svg>`;
     default:
@@ -45,6 +47,13 @@ const abCoverHoverPreview = {
   root: null,
   image: null,
   activeLink: null,
+};
+
+const abXwayOverlayState = {
+  root: null,
+  body: null,
+  title: null,
+  meta: null,
 };
 
 function ensureAbCoverHoverPreview() {
@@ -158,6 +167,239 @@ function bindAbPageEvents() {
   document.addEventListener("ab:content-render", () => {
     hideAbCoverHoverPreview();
   });
+
+  document.addEventListener("click", async (event) => {
+    const actionButton = event.target instanceof Element ? event.target.closest("[data-ab-action='open-xway-metrics']") : null;
+    if (!(actionButton instanceof HTMLButtonElement)) {
+      const closeButton = event.target instanceof Element ? event.target.closest("[data-ab-action='close-xway-overlay']") : null;
+      if (closeButton instanceof HTMLButtonElement) {
+        closeAbXwayOverlay();
+      }
+      return;
+    }
+
+    await openAbXwayOverlay(actionButton);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeAbXwayOverlay();
+    }
+  });
+}
+
+function ensureAbXwayOverlay() {
+  if (abXwayOverlayState.root) {
+    return abXwayOverlayState;
+  }
+
+  const root = document.createElement("div");
+  root.className = "ab-xway-overlay";
+  root.setAttribute("aria-hidden", "true");
+  root.innerHTML = `
+    <div class="ab-xway-overlay-backdrop" data-ab-action="close-xway-overlay"></div>
+    <div class="ab-xway-overlay-dialog" role="dialog" aria-modal="true" aria-labelledby="abXwayOverlayTitle">
+      <header class="ab-xway-overlay-head">
+        <div>
+          <h3 id="abXwayOverlayTitle">XWAY конверсии по типу РК</h3>
+          <p class="ab-xway-overlay-meta"></p>
+        </div>
+        <button type="button" class="ab-head-action-btn ab-xway-close-btn" data-ab-action="close-xway-overlay">Закрыть</button>
+      </header>
+      <div class="ab-xway-overlay-body"></div>
+    </div>
+  `;
+  document.body.appendChild(root);
+  abXwayOverlayState.root = root;
+  abXwayOverlayState.body = root.querySelector(".ab-xway-overlay-body");
+  abXwayOverlayState.title = root.querySelector("#abXwayOverlayTitle");
+  abXwayOverlayState.meta = root.querySelector(".ab-xway-overlay-meta");
+  return abXwayOverlayState;
+}
+
+function closeAbXwayOverlay() {
+  if (!abXwayOverlayState.root) {
+    return;
+  }
+  abXwayOverlayState.root.classList.remove("is-visible");
+  abXwayOverlayState.root.setAttribute("aria-hidden", "true");
+}
+
+function formatAbXwayIsoDate(isoDateRaw) {
+  const value = String(isoDateRaw || "").trim();
+  if (!value) {
+    return "—";
+  }
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  }).format(date);
+}
+
+function formatAbXwayMetricValue(valueRaw, kind) {
+  const value = Number(valueRaw);
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  if (kind === "percent") {
+    return `${(value * 100).toFixed(2).replace(".", ",")}%`;
+  }
+  return new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatAbXwayDelta(valueRaw) {
+  const value = Number(valueRaw);
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  const percent = value * 100;
+  const sign = percent > 0 ? "+" : "";
+  return `${sign}${percent.toFixed(0).replace(".", ",")}%`;
+}
+
+function getAbXwayDeltaKind(valueRaw) {
+  const value = Number(valueRaw);
+  if (!Number.isFinite(value)) {
+    return "neutral";
+  }
+  if (value > 0) {
+    return "good";
+  }
+  if (value < 0) {
+    return "bad";
+  }
+  return "neutral";
+}
+
+function renderAbXwayOverlayLoading(button) {
+  const overlay = ensureAbXwayOverlay();
+  const testId = String(button.dataset.abTestId || "").trim();
+  const campaignType = String(button.dataset.abCampaignType || "").trim() || "—";
+  overlay.title.textContent = `XWAY • Тест ${testId}`;
+  overlay.meta.textContent = `Тип РК: ${campaignType}`;
+  overlay.body.innerHTML = `<div class="ab-xway-state-card is-loading">Загружаю XWAY-метрики по выбранному типу РК…</div>`;
+  overlay.root.classList.add("is-visible");
+  overlay.root.setAttribute("aria-hidden", "false");
+}
+
+function renderAbXwayOverlayError(button, message) {
+  const overlay = ensureAbXwayOverlay();
+  const testId = String(button.dataset.abTestId || "").trim();
+  overlay.title.textContent = `XWAY • Тест ${testId}`;
+  overlay.meta.textContent = "Не удалось получить данные XWAY.";
+  overlay.body.innerHTML = `<div class="ab-xway-state-card is-error">${escapeHtml(message || "Ошибка загрузки XWAY-данных.")}</div>`;
+  overlay.root.classList.add("is-visible");
+  overlay.root.setAttribute("aria-hidden", "false");
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function renderAbXwayOverlayData(button, payload) {
+  const overlay = ensureAbXwayOverlay();
+  const testId = String(payload?.testId || button.dataset.abTestId || "").trim();
+  const campaignType = String(payload?.campaignType || button.dataset.abCampaignType || "").trim() || "—";
+  const beforeDate = formatAbXwayIsoDate(payload?.range?.before);
+  const afterDate = formatAbXwayIsoDate(payload?.range?.after);
+  overlay.title.textContent = `XWAY • Тест ${testId}`;
+  overlay.meta.textContent = `Тип РК: ${campaignType} · До: ${beforeDate} - ${beforeDate} · После: ${afterDate} - ${afterDate}`;
+
+  const rows = Array.isArray(payload?.metrics) ? payload.metrics : [];
+  const campaignsBefore = Array.isArray(payload?.matchedCampaigns?.before) ? payload.matchedCampaigns.before : [];
+  const campaignsAfter = Array.isArray(payload?.matchedCampaigns?.after) ? payload.matchedCampaigns.after : [];
+  const totalsBefore = payload?.totals?.before || {};
+  const totalsAfter = payload?.totals?.after || {};
+
+  overlay.body.innerHTML = `
+    <div class="ab-xway-summary-grid">
+      <div class="ab-xway-summary-card">
+        <h4>До</h4>
+        <div class="ab-xway-summary-line">Кампаний: <strong>${new Intl.NumberFormat("ru-RU").format(Number(totalsBefore.matchedCount) || 0)}</strong></div>
+        <div class="ab-xway-summary-line">Показы: <strong>${new Intl.NumberFormat("ru-RU").format(Number(totalsBefore.views) || 0)}</strong></div>
+        <div class="ab-xway-summary-line">Клики: <strong>${new Intl.NumberFormat("ru-RU").format(Number(totalsBefore.clicks) || 0)}</strong></div>
+        <div class="ab-xway-summary-line">ATB: <strong>${new Intl.NumberFormat("ru-RU").format(Number(totalsBefore.atbs) || 0)}</strong></div>
+        <div class="ab-xway-summary-line">Заказы: <strong>${new Intl.NumberFormat("ru-RU").format(Number(totalsBefore.orders) || 0)}</strong></div>
+      </div>
+      <div class="ab-xway-summary-card">
+        <h4>После</h4>
+        <div class="ab-xway-summary-line">Кампаний: <strong>${new Intl.NumberFormat("ru-RU").format(Number(totalsAfter.matchedCount) || 0)}</strong></div>
+        <div class="ab-xway-summary-line">Показы: <strong>${new Intl.NumberFormat("ru-RU").format(Number(totalsAfter.views) || 0)}</strong></div>
+        <div class="ab-xway-summary-line">Клики: <strong>${new Intl.NumberFormat("ru-RU").format(Number(totalsAfter.clicks) || 0)}</strong></div>
+        <div class="ab-xway-summary-line">ATB: <strong>${new Intl.NumberFormat("ru-RU").format(Number(totalsAfter.atbs) || 0)}</strong></div>
+        <div class="ab-xway-summary-line">Заказы: <strong>${new Intl.NumberFormat("ru-RU").format(Number(totalsAfter.orders) || 0)}</strong></div>
+      </div>
+    </div>
+    <div class="ab-xway-table-wrap">
+      <table class="ab-mini-table is-tight">
+        <thead>
+          <tr><th>Метрика</th><th>До</th><th>После</th><th>Прирост</th></tr>
+        </thead>
+        <tbody>
+          ${rows.length ? rows.map((row) => `
+            <tr>
+              <td>${escapeHtml(row.label)}</td>
+              <td>${escapeHtml(formatAbXwayMetricValue(row.before, row.kind))}</td>
+              <td>${escapeHtml(formatAbXwayMetricValue(row.after, row.kind))}</td>
+              <td>${Number.isFinite(Number(row.delta)) ? `<span class="ab-delta-pill is-${escapeHtml(getAbXwayDeltaKind(row.delta))}">${escapeHtml(formatAbXwayDelta(row.delta))}</span>` : "—"}</td>
+            </tr>
+          `).join("") : '<tr><td colspan="4">Нет метрик для выбранного типа РК.</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+    <div class="ab-xway-campaigns-grid">
+      <div class="ab-xway-campaigns-card">
+        <h4>Кампании до</h4>
+        ${campaignsBefore.length ? `<ul>${campaignsBefore.map((item) => `<li>${escapeHtml(item.name || String(item.id || "—"))}</li>`).join("")}</ul>` : '<div class="ab-xway-campaigns-empty">Нет кампаний этого типа.</div>'}
+      </div>
+      <div class="ab-xway-campaigns-card">
+        <h4>Кампании после</h4>
+        ${campaignsAfter.length ? `<ul>${campaignsAfter.map((item) => `<li>${escapeHtml(item.name || String(item.id || "—"))}</li>`).join("")}</ul>` : '<div class="ab-xway-campaigns-empty">Нет кампаний этого типа.</div>'}
+      </div>
+    </div>
+  `;
+  overlay.root.classList.add("is-visible");
+  overlay.root.setAttribute("aria-hidden", "false");
+}
+
+async function openAbXwayOverlay(button) {
+  renderAbXwayOverlayLoading(button);
+
+  const params = new URLSearchParams({
+    testId: String(button.dataset.abTestId || "").trim(),
+    campaignType: String(button.dataset.abCampaignType || "").trim(),
+    startedAt: String(button.dataset.abStartedAt || "").trim(),
+    endedAt: String(button.dataset.abEndedAt || "").trim(),
+  });
+
+  try {
+    const response = await fetch(`/api/xway-ab-test?${params.toString()}`, {
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload?.ok) {
+      throw new Error(payload?.message || "Не удалось получить данные XWAY.");
+    }
+    renderAbXwayOverlayData(button, payload);
+  } catch (error) {
+    renderAbXwayOverlayError(button, error instanceof Error ? error.message : "Не удалось получить данные XWAY.");
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
