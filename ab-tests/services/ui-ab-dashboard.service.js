@@ -159,6 +159,21 @@ function abFormatInt(valueRaw) {
   return new Intl.NumberFormat("ru-RU").format(Math.round(value));
 }
 
+function abExtractCampaignExternalId(testTitleRaw) {
+  const title = String(testTitleRaw || "").trim();
+  if (!title) {
+    return "";
+  }
+  const parts = title
+    .split("/")
+    .map((part) => String(part || "").trim())
+    .filter(Boolean);
+  if (parts.length < 3) {
+    return "";
+  }
+  return String(parts[2] || "").trim();
+}
+
 function abFormatPercent(valueRaw, digits = 2) {
   const value = Number(valueRaw);
   if (!Number.isFinite(value)) {
@@ -799,6 +814,7 @@ function abBuildComputedTestCard(sourceRow, resultsByTest, catalogIndex) {
   const xwayUrl = String(abCellText(sourceRow, "F") || "").trim();
   const startedAtIso = abParseDateLiteral(abCellRaw(sourceRow, "M"));
   const endedAtIso = abParseDateLiteral(abCellRaw(sourceRow, "O"));
+  const campaignExternalId = abExtractCampaignExternalId(testTitle);
 
   const variants = abBuildVariantCards(resultsByTest.get(testId), endedAtIso);
   const metricsBlock = abBuildComputedMetricsBlock(sourceRow, variants);
@@ -894,6 +910,7 @@ function abBuildComputedTestCard(sourceRow, resultsByTest, catalogIndex) {
     title: testTitle || productName,
     productName,
     type: String(abCellText(sourceRow, "D") || "").trim(),
+    campaignExternalId,
     cabinet: abResolveCabinet(testTitle),
     startedAt: abFormatSourceDateTime(abCellRaw(sourceRow, "M")),
     startedAtIso: startedAtIso || "",
@@ -1436,6 +1453,7 @@ function renderAbTestCard(test) {
             data-ab-action="open-xway-metrics"
             data-ab-test-id="${abEscapeAttr(test.testId)}"
             data-ab-campaign-type="${abEscapeAttr(test.type || "")}"
+            data-ab-campaign-external-id="${abEscapeAttr(test.campaignExternalId || "")}"
             data-ab-started-at="${abEscapeAttr(test.startedAtIso || "")}"
             data-ab-ended-at="${abEscapeAttr(test.endedAtIso || "")}"
             aria-label="Показать конверсии XWAY по типу РК"
@@ -1835,4 +1853,12 @@ async function refreshAbDashboardData() {
 
 function isAbDashboardLoading() {
   return abDashboardStore.loading === true;
+}
+
+function getAbDashboardTestById(testIdRaw) {
+  const testId = String(testIdRaw || "").trim();
+  if (!testId || !Array.isArray(abDashboardStore.data?.tests)) {
+    return null;
+  }
+  return abDashboardStore.data.tests.find((test) => String(test?.testId || "").trim() === testId) || null;
 }

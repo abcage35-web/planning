@@ -1109,6 +1109,26 @@ body {
   padding: 8px 12px;
 }
 
+.ab-xway-metrics-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ab-xway-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ab-xway-table-head h4 {
+  margin: 0;
+  color: #27414f;
+  font: 700 16px/1.15 "IBM Plex Sans", sans-serif;
+}
+
 .ab-xway-campaigns-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1759,6 +1779,7 @@ body {
   }
 
   .ab-xway-summary-grid,
+  .ab-xway-metrics-compare-grid,
   .ab-xway-campaigns-grid {
     grid-template-columns: 1fr;
   }

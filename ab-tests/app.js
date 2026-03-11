@@ -309,14 +309,61 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function getAbExportComparisonRows(testIdRaw) {
+  if (typeof getAbDashboardTestById !== "function") {
+    return [];
+  }
+  const test = getAbDashboardTestById(testIdRaw);
+  const rows = Array.isArray(test?.comparisonRows) ? test.comparisonRows : [];
+  return rows.filter((row) => {
+    const label = String(row?.label || "").trim().toUpperCase();
+    return label && label !== "ЦЕНА" && label !== "ОТКЛ. ЦЕНЫ";
+  });
+}
+
+function renderAbOverlayMetricTableRows(rows, options = {}) {
+  const {
+    useRawText = false,
+    emptyMessage = "Нет данных.",
+  } = options;
+  if (!Array.isArray(rows) || !rows.length) {
+    return `<tr><td colspan="4">${escapeHtml(emptyMessage)}</td></tr>`;
+  }
+  return rows
+    .map((row) => {
+      const beforeText = useRawText ? String(row?.before || "—") : formatAbXwayMetricValue(row?.before, row?.kind);
+      const afterText = useRawText ? String(row?.after || "—") : formatAbXwayMetricValue(row?.after, row?.kind);
+      const deltaValue = useRawText ? null : Number(row?.delta);
+      const deltaText = useRawText ? String(row?.deltaText || "—") : formatAbXwayDelta(deltaValue);
+      const deltaKind = useRawText ? String(row?.deltaKind || "unknown") : getAbXwayDeltaKind(deltaValue);
+      const deltaHtml =
+        deltaText !== "—"
+          ? `<span class="ab-delta-pill is-${escapeHtml(deltaKind)}">${escapeHtml(deltaText)}</span>`
+          : "—";
+      return `
+        <tr>
+          <td>${escapeHtml(row?.label || "—")}</td>
+          <td>${escapeHtml(beforeText)}</td>
+          <td>${escapeHtml(afterText)}</td>
+          <td>${deltaHtml}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
 function renderAbXwayOverlayData(button, payload) {
   const overlay = ensureAbXwayOverlay();
   const testId = String(payload?.testId || button.dataset.abTestId || "").trim();
   const campaignType = String(payload?.campaignType || button.dataset.abCampaignType || "").trim() || "—";
+  const campaignExternalId = String(
+    payload?.campaignExternalId || button.dataset.abCampaignExternalId || "",
+  ).trim();
   const beforeDate = formatAbXwayIsoDate(payload?.range?.before);
   const afterDate = formatAbXwayIsoDate(payload?.range?.after);
+  const exportRows = getAbExportComparisonRows(testId);
   overlay.title.textContent = `XWAY • Тест ${testId}`;
-  overlay.meta.textContent = `Тип РК: ${campaignType} · До: ${beforeDate} - ${beforeDate} · После: ${afterDate} - ${afterDate}`;
+  overlay.meta.textContent = `Тип РК: ${campaignType}${campaignExternalId ? ` · ID РК: ${campaignExternalId}` : ""} · До: ${beforeDate} - ${beforeDate} · После: ${afterDate} - ${afterDate}`;
 
   const rows = Array.isArray(payload?.metrics) ? payload.metrics : [];
   const campaignsBefore = Array.isArray(payload?.matchedCampaigns?.before) ? payload.matchedCampaigns.before : [];
@@ -343,22 +390,29 @@ function renderAbXwayOverlayData(button, payload) {
         <div class="ab-xway-summary-line">Заказы: <strong>${new Intl.NumberFormat("ru-RU").format(Number(totalsAfter.orders) || 0)}</strong></div>
       </div>
     </div>
-    <div class="ab-xway-table-wrap">
-      <table class="ab-mini-table is-tight">
-        <thead>
-          <tr><th>Метрика</th><th>До</th><th>После</th><th>Прирост</th></tr>
-        </thead>
-        <tbody>
-          ${rows.length ? rows.map((row) => `
-            <tr>
-              <td>${escapeHtml(row.label)}</td>
-              <td>${escapeHtml(formatAbXwayMetricValue(row.before, row.kind))}</td>
-              <td>${escapeHtml(formatAbXwayMetricValue(row.after, row.kind))}</td>
-              <td>${Number.isFinite(Number(row.delta)) ? `<span class="ab-delta-pill is-${escapeHtml(getAbXwayDeltaKind(row.delta))}">${escapeHtml(formatAbXwayDelta(row.delta))}</span>` : "—"}</td>
-            </tr>
-          `).join("") : '<tr><td colspan="4">Нет метрик для выбранного типа РК.</td></tr>'}
-        </tbody>
-      </table>
+    <div class="ab-xway-metrics-compare-grid">
+      <div class="ab-xway-table-wrap">
+        <div class="ab-xway-table-head">
+          <h4>Из выгрузки</h4>
+        </div>
+        <table class="ab-mini-table is-tight">
+          <thead>
+            <tr><th>Метрика</th><th>До</th><th>После</th><th>Прирост</th></tr>
+          </thead>
+          <tbody>${renderAbOverlayMetricTableRows(exportRows, { useRawText: true, emptyMessage: "Нет метрик в выгрузке." })}</tbody>
+        </table>
+      </div>
+      <div class="ab-xway-table-wrap">
+        <div class="ab-xway-table-head">
+          <h4>Из XWAY</h4>
+        </div>
+        <table class="ab-mini-table is-tight">
+          <thead>
+            <tr><th>Метрика</th><th>До</th><th>После</th><th>Прирост</th></tr>
+          </thead>
+          <tbody>${renderAbOverlayMetricTableRows(rows, { useRawText: false, emptyMessage: "Нет метрик для выбранного типа РК." })}</tbody>
+        </table>
+      </div>
     </div>
     <div class="ab-xway-campaigns-grid">
       <div class="ab-xway-campaigns-card">
@@ -381,6 +435,7 @@ async function openAbXwayOverlay(button) {
   const params = new URLSearchParams({
     testId: String(button.dataset.abTestId || "").trim(),
     campaignType: String(button.dataset.abCampaignType || "").trim(),
+    campaignExternalId: String(button.dataset.abCampaignExternalId || "").trim(),
     startedAt: String(button.dataset.abStartedAt || "").trim(),
     endedAt: String(button.dataset.abEndedAt || "").trim(),
   });
