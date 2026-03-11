@@ -646,22 +646,20 @@ function getAbExportSummaryChecks(testIdRaw) {
 
 function getAbXwaySummaryChecks(testIdRaw, payload) {
   const exportChecks = getAbExportSummaryChecks(testIdRaw);
+  const exportCtrRaw = String(exportChecks?.ctr || "").trim();
   const priceRaw = String(exportChecks?.price || "").trim();
   const rows = Array.isArray(payload?.metrics) ? payload.metrics : [];
-  const ctrRow = rows.find((row) => String(row?.label || "").trim().toUpperCase() === "CTR");
   const ctrCr1Row = rows.find((row) => String(row?.label || "").trim().toUpperCase() === "CTR*CR1");
 
-  const ctrRaw =
-    typeof abResolveCtrDecisionRaw === "function" ? abResolveCtrDecisionRaw(Number(ctrRow?.delta)) : "";
   const ctrCr1Raw =
     typeof abResolveCtrCr1DecisionRaw === "function" ? abResolveCtrCr1DecisionRaw(Number(ctrCr1Row?.delta)) : "";
   const overallRaw =
     typeof abResolveOverallDecisionRaw === "function"
-      ? abResolveOverallDecisionRaw([ctrRaw, priceRaw, ctrCr1Raw])
+      ? abResolveOverallDecisionRaw([exportCtrRaw, priceRaw, ctrCr1Raw])
       : "";
 
   return {
-    ctr: String(ctrRaw || "").trim(),
+    ctr: exportCtrRaw,
     price: priceRaw,
     ctrCr1: String(ctrCr1Raw || "").trim(),
     overall: String(overallRaw || "").trim(),
