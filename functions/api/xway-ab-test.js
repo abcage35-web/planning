@@ -26,6 +26,18 @@ function parseCampaignTypeFallback(testNameRaw) {
   return parts.length >= 2 ? parts[1].toUpperCase() : "";
 }
 
+function parseCampaignExternalIdFallback(testNameRaw) {
+  const name = String(testNameRaw || "").trim();
+  if (!name) {
+    return "";
+  }
+  const parts = name
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.length >= 3 ? String(parts[2] || "").trim() : "";
+}
+
 function buildProductPageReferer(shopIdRaw, productIdRaw) {
   const shopId = String(shopIdRaw || "").trim();
   const productId = String(productIdRaw || "").trim();
@@ -38,6 +50,7 @@ function buildProductPageReferer(shopIdRaw, productIdRaw) {
 function normalizeCampaignRecord(campaign) {
   return {
     id: Number(campaign?.id) || 0,
+    externalId: String(campaign?.external_id || "").trim(),
     name: String(campaign?.name || "").trim(),
     query: String(campaign?.query || "").trim(),
     typeId: String(campaign?.type || "").trim(),
@@ -48,6 +61,14 @@ function normalizeCampaignRecord(campaign) {
       orders: Number(campaign?.stat?.orders) || 0,
     },
   };
+}
+
+function matchCampaignRecord(campaign, campaignTypeRaw, campaignExternalIdRaw) {
+  const campaignExternalId = String(campaignExternalIdRaw || "").trim();
+  if (campaignExternalId) {
+    return String(campaign?.externalId || "").trim() === campaignExternalId;
+  }
+  return xwayMatchCampaignType(campaign, campaignTypeRaw);
 }
 
 function buildMetricsRows(beforeMetrics, afterMetrics) {
@@ -79,6 +100,7 @@ export async function onRequestGet(context) {
   const url = new URL(request.url);
   const testId = String(url.searchParams.get("testId") || "").trim();
   const explicitCampaignType = xwayNormalizeCampaignType(url.searchParams.get("campaignType"));
+  const explicitCampaignExternalId = String(url.searchParams.get("campaignExternalId") || "").trim();
   const explicitStartedAt = String(url.searchParams.get("startedAt") || "").trim();
   const explicitEndedAt = String(url.searchParams.get("endedAt") || "").trim();
   if (!testId) {
@@ -134,6 +156,7 @@ export async function onRequestGet(context) {
     }
 
     const campaignType = explicitCampaignType || parseCampaignTypeFallback(testInfo?.name);
+    const campaignExternalId = explicitCampaignExternalId || parseCampaignExternalIdFallback(testInfo?.name);
 
     const [beforeStata, afterStata] = await Promise.all([
       xwayFetchJson(
@@ -151,8 +174,12 @@ export async function onRequestGet(context) {
     const beforeCampaignsAll = (Array.isArray(beforeStata?.campaign_wb) ? beforeStata.campaign_wb : []).map(normalizeCampaignRecord);
     const afterCampaignsAll = (Array.isArray(afterStata?.campaign_wb) ? afterStata.campaign_wb : []).map(normalizeCampaignRecord);
 
-    const beforeCampaigns = beforeCampaignsAll.filter((campaign) => xwayMatchCampaignType(campaign, campaignType));
-    const afterCampaigns = afterCampaignsAll.filter((campaign) => xwayMatchCampaignType(campaign, campaignType));
+    const beforeCampaigns = beforeCampaignsAll.filter((campaign) =>
+      matchCampaignRecord(campaign, campaignType, campaignExternalId),
+    );
+    const afterCampaigns = afterCampaignsAll.filter((campaign) =>
+      matchCampaignRecord(campaign, campaignType, campaignExternalId),
+    );
 
     const beforeTotals = xwayAggregateCampaignStats(beforeCampaigns);
     const afterTotals = xwayAggregateCampaignStats(afterCampaigns);
@@ -164,6 +191,7 @@ export async function onRequestGet(context) {
       source: "xway",
       testId,
       campaignType,
+      campaignExternalId,
       range: {
         before: beforeDate,
         after: afterDate,
@@ -183,10 +211,12 @@ export async function onRequestGet(context) {
       matchedCampaigns: {
         before: beforeCampaigns.map((campaign) => ({
           id: campaign.id,
+          externalId: campaign.externalId,
           name: campaign.name || campaign.query,
         })),
         after: afterCampaigns.map((campaign) => ({
           id: campaign.id,
+          externalId: campaign.externalId,
           name: campaign.name || campaign.query,
         })),
       },
