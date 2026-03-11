@@ -659,6 +659,9 @@ function getAbXwaySummaryChecks(testIdRaw, payload) {
       : "";
 
   return {
+    testCtr: exportCtrRaw,
+    testPrice: priceRaw,
+    testCtrCr1: String(ctrCr1Raw || "").trim(),
     ctr: exportCtrRaw,
     price: priceRaw,
     ctrCr1: String(ctrCr1Raw || "").trim(),
