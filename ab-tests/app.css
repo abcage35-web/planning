@@ -300,6 +300,14 @@ body {
   font: 700 13px/1.1 "IBM Plex Sans", sans-serif;
 }
 
+.ab-funnel-source-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .ab-funnel-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -473,6 +481,18 @@ body {
     0 8px 18px rgba(18, 46, 57, 0.08);
   transform: translateY(-1px);
   outline: none;
+}
+
+.ab-head-action-btn[disabled] {
+  cursor: progress;
+  opacity: 0.72;
+  transform: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.ab-head-action-btn.is-loading .ab-card-help-icon,
+.ab-head-action-btn[disabled] .ab-card-help-icon {
+  animation: startup-spin 0.9s linear infinite;
 }
 
 .ab-link {
@@ -1159,6 +1179,13 @@ body {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2;
+}
+
+.ab-xway-refresh-all-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  gap: 8px;
+  font: 700 12px/1 "IBM Plex Sans", sans-serif;
 }
 
 .ab-hover-tooltip {

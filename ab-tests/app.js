@@ -63,6 +63,37 @@ const abXwaySummaryState = {
   funnelRunId: 0,
   concurrency: 3,
 };
+const AB_XWAY_ERROR_CACHE_TTL_MS = 60_000;
+const AB_XWAY_REQUEST_RETRIES = 2;
+const AB_XWAY_REQUEST_RETRY_DELAY_MS = 500;
+
+function wait(durationMs) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(durationMs) || 0)));
+}
+
+function isAbXwayRetryableStatus(statusRaw) {
+  const status = Number(statusRaw);
+  return status === 408 || status === 425 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function isAbXwayRetryableError(error) {
+  if (!error) {
+    return false;
+  }
+  if (isAbXwayRetryableStatus(error.status)) {
+    return true;
+  }
+  const message = String(error instanceof Error ? error.message : error || "").toLowerCase();
+  return (
+    message.includes("failed to fetch")
+    || message.includes("network")
+    || message.includes("load failed")
+    || message.includes("timeout")
+    || message.includes("502")
+    || message.includes("503")
+    || message.includes("504")
+  );
+}
 
 function ensureAbCoverHoverPreview() {
   if (abCoverHoverPreview.root && abCoverHoverPreview.image) {
@@ -179,16 +210,27 @@ function bindAbPageEvents() {
   });
 
   document.addEventListener("click", async (event) => {
-    const actionButton = event.target instanceof Element ? event.target.closest("[data-ab-action='open-xway-metrics']") : null;
-    if (!(actionButton instanceof HTMLButtonElement)) {
-      const closeButton = event.target instanceof Element ? event.target.closest("[data-ab-action='close-xway-overlay']") : null;
-      if (closeButton instanceof HTMLButtonElement) {
-        closeAbXwayOverlay();
-      }
+    const actionTarget = event.target instanceof Element ? event.target.closest("[data-ab-action]") : null;
+    if (!(actionTarget instanceof Element)) {
       return;
     }
 
-    await openAbXwayOverlay(actionButton);
+    const action = String(actionTarget.getAttribute("data-ab-action") || "").trim();
+    if (action === "close-xway-overlay") {
+      closeAbXwayOverlay();
+      return;
+    }
+    if (action === "refresh-xway-filtered" && actionTarget instanceof HTMLButtonElement) {
+      await refreshAbXwayFilteredResults(actionTarget);
+      return;
+    }
+    if (action === "refresh-xway-summary" && actionTarget instanceof HTMLButtonElement) {
+      await refreshSingleAbXwaySummary(actionTarget);
+      return;
+    }
+    if (action === "open-xway-metrics" && actionTarget instanceof HTMLButtonElement) {
+      await openAbXwayOverlay(actionTarget);
+    }
   });
 
   document.addEventListener("keydown", (event) => {
@@ -209,6 +251,16 @@ function getAbXwayRequestMeta(source) {
   };
 }
 
+function buildAbXwayRequestMetaFromTest(test) {
+  return {
+    testId: String(test?.testId || "").trim(),
+    campaignType: String(test?.type || "").trim(),
+    campaignExternalId: String(test?.campaignExternalId || "").trim(),
+    startedAt: String(test?.startedAtIso || "").trim(),
+    endedAt: String(test?.endedAtIso || "").trim(),
+  };
+}
+
 function buildAbXwayRequestKey(meta) {
   return [
     String(meta?.testId || "").trim(),
@@ -219,7 +271,52 @@ function buildAbXwayRequestKey(meta) {
   ].join("|");
 }
 
-async function requestAbXwayPayload(meta) {
+function getAbFilteredXwayTests() {
+  if (!abDashboardStore?.data || typeof abFilterTests !== "function") {
+    return [];
+  }
+  return abFilterTests(abDashboardStore.data);
+}
+
+function getAbXwayQueueItems(testsRaw) {
+  const tests = Array.isArray(testsRaw) ? testsRaw : [];
+  return tests
+    .map((test) => ({
+      test,
+      meta: buildAbXwayRequestMetaFromTest(test),
+    }))
+    .filter((item) => item.meta.testId);
+}
+
+function getAbXwaySummaryContainers(testIdsRaw = null) {
+  const testIds = testIdsRaw instanceof Set ? testIdsRaw : null;
+  return Array.from(document.querySelectorAll("[data-ab-xway-summary-card]")).filter((container) => {
+    if (!(container instanceof HTMLElement)) {
+      return false;
+    }
+    if (!testIds) {
+      return true;
+    }
+    return testIds.has(String(container.dataset.abTestId || "").trim());
+  });
+}
+
+function invalidateAbXwayCacheForMeta(meta) {
+  abXwaySummaryState.cache.delete(buildAbXwayRequestKey(meta));
+}
+
+function setAbXwayActionLoading(button, isLoading) {
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+  button.disabled = isLoading;
+  button.classList.toggle("is-loading", isLoading);
+  button.setAttribute("aria-busy", isLoading ? "true" : "false");
+}
+
+async function requestAbXwayPayload(meta, options = {}) {
+  const force = options && options.force === true;
+  const retries = Math.max(0, Number(options?.retries ?? AB_XWAY_REQUEST_RETRIES) || 0);
   const params = new URLSearchParams({
     testId: String(meta?.testId || "").trim(),
     campaignType: String(meta?.campaignType || "").trim(),
@@ -227,18 +324,48 @@ async function requestAbXwayPayload(meta) {
     startedAt: String(meta?.startedAt || "").trim(),
     endedAt: String(meta?.endedAt || "").trim(),
   });
-
-  const response = await fetch(`/api/xway-ab-test?${params.toString()}`, {
-    credentials: "same-origin",
-    headers: {
-      Accept: "application/json",
-    },
-  });
-  const payload = await response.json();
-  if (!response.ok || !payload?.ok) {
-    throw new Error(payload?.message || "Не удалось получить данные XWAY.");
+  if (force) {
+    params.set("_ts", String(Date.now()));
   }
-  return payload;
+
+  let lastError = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetch(`/api/xway-ab-test?${params.toString()}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+      const responseText = await response.text();
+      let payload = null;
+      if (responseText.trim()) {
+        try {
+          payload = JSON.parse(responseText);
+        } catch {
+          const parseError = new Error("Сервер вернул невалидный ответ XWAY.");
+          parseError.status = response.status;
+          throw parseError;
+        }
+      }
+      if (!response.ok || !payload?.ok) {
+        const requestError = new Error(payload?.message || "Не удалось получить данные XWAY.");
+        requestError.status = response.status;
+        throw requestError;
+      }
+      return payload;
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries && isAbXwayRetryableError(error)) {
+        await wait(AB_XWAY_REQUEST_RETRY_DELAY_MS * (attempt + 1));
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError || new Error("Не удалось получить данные XWAY.");
 }
 
 function renderAbXwaySummaryPending(container, message = "Считаю XWAY…") {
@@ -267,23 +394,28 @@ function renderAbXwaySummaryReady(container, checks) {
   flowNode.innerHTML = renderAbSummaryFlow(checks);
 }
 
-async function resolveAbXwaySummaryForMeta(meta) {
+async function resolveAbXwaySummaryForMeta(meta, options = {}) {
+  const force = options && options.force === true;
   const key = buildAbXwayRequestKey(meta);
-  const cached = abXwaySummaryState.cache.get(key);
-  if (cached) {
-    if (cached.status === "ready") {
-      return cached;
+  if (!force) {
+    const cached = abXwaySummaryState.cache.get(key);
+    if (cached) {
+      if (cached.status === "ready") {
+        return cached;
+      }
+      if (cached.status === "error" && Date.now() - cached.savedAt < AB_XWAY_ERROR_CACHE_TTL_MS) {
+        return cached;
+      }
     }
-    if (cached.status === "error" && Date.now() - cached.savedAt < 60_000) {
-      return cached;
-    }
+  } else {
+    invalidateAbXwayCacheForMeta(meta);
   }
 
   if (abXwaySummaryState.inflight.has(key)) {
     return abXwaySummaryState.inflight.get(key);
   }
 
-  const task = requestAbXwayPayload(meta)
+  const task = requestAbXwayPayload(meta, { force })
     .then((payload) => {
       const result = {
         status: "ready",
@@ -311,15 +443,18 @@ async function resolveAbXwaySummaryForMeta(meta) {
   return task;
 }
 
-async function hydrateVisibleAbXwaySummaries() {
+async function hydrateVisibleAbXwaySummaries(options = {}) {
+  const force = options && options.force === true;
+  const targetTestIds = options?.testIds instanceof Set ? options.testIds : null;
+  const pendingMessage = String(options?.pendingMessage || (force ? "Обновляю XWAY…" : "Считаю XWAY…")).trim();
   const runId = ++abXwaySummaryState.summaryRunId;
-  const containers = Array.from(document.querySelectorAll("[data-ab-xway-summary-card]"));
+  const containers = getAbXwaySummaryContainers(targetTestIds);
   if (!containers.length) {
     return;
   }
 
   const queue = containers.slice();
-  queue.forEach((container) => renderAbXwaySummaryPending(container));
+  queue.forEach((container) => renderAbXwaySummaryPending(container, pendingMessage));
 
   const worker = async () => {
     while (queue.length) {
@@ -334,14 +469,16 @@ async function hydrateVisibleAbXwaySummaries() {
         continue;
       }
 
-      const result = await resolveAbXwaySummaryForMeta(meta);
+      const result = await resolveAbXwaySummaryForMeta(meta, { force });
       if (!container.isConnected || runId !== abXwaySummaryState.summaryRunId) {
         continue;
       }
 
       if (result?.status === "ready") {
+        setAbXwayChecksOnTest(meta.testId, result.checks);
         renderAbXwaySummaryReady(container, result.checks);
       } else {
+        setAbXwayChecksOnTest(meta.testId, null);
         renderAbXwaySummaryError(container, result?.error || "Не удалось получить данные XWAY.");
       }
     }
@@ -367,7 +504,27 @@ function renderAbXwayFunnelStatus(statusNode, text) {
   statusNode.textContent = String(text || "");
 }
 
-async function hydrateAbXwayFunnelDashboard() {
+function renderAbXwayFunnelPending(grid, statusNode, filteredTests, cabinetOrder, total, message) {
+  if (!(grid instanceof HTMLElement) || !(statusNode instanceof HTMLElement)) {
+    return;
+  }
+  if (typeof abBuildCabinetFunnelCards !== "function" || typeof renderAbFunnelCardsHtml !== "function") {
+    renderAbXwayFunnelStatus(statusNode, "Нет данных");
+    return;
+  }
+  const exportCards = abBuildCabinetFunnelCards(filteredTests, cabinetOrder, "export");
+  grid.innerHTML = renderAbFunnelCardsHtml(exportCards, "xway", {
+    pending: true,
+    pendingMessage: message,
+    pendingStatus: "…",
+  });
+  renderAbXwayFunnelStatus(statusNode, `${message} 0 / ${total}`);
+}
+
+async function hydrateAbXwayFunnelDashboard(options = {}) {
+  const force = options && options.force === true;
+  const reset = options && options.reset === true;
+  const providedTests = Array.isArray(options?.tests) ? options.tests : null;
   const grid = document.querySelector("[data-ab-xway-funnel-grid]");
   const statusNode = document.querySelector("[data-ab-xway-funnel-status]");
   if (!(grid instanceof HTMLElement) || !(statusNode instanceof HTMLElement)) {
@@ -379,7 +536,7 @@ async function hydrateAbXwayFunnelDashboard() {
     return;
   }
 
-  const filteredTests = abFilterTests(abDashboardStore.data);
+  const filteredTests = providedTests || getAbFilteredXwayTests();
   if (!filteredTests.length) {
     grid.innerHTML = "";
     renderAbXwayFunnelStatus(statusNode, "Нет тестов");
@@ -393,22 +550,21 @@ async function hydrateAbXwayFunnelDashboard() {
   let done = 0;
   let ready = 0;
   let errors = 0;
-
-  renderAbXwayFunnelStatus(statusNode, `Считаю XWAY… 0 / ${filteredTests.length}`);
-
-  const queue = filteredTests
-    .map((test) => ({
-      test,
-      meta: {
-        testId: String(test?.testId || "").trim(),
-        campaignType: String(test?.type || "").trim(),
-        campaignExternalId: String(test?.campaignExternalId || "").trim(),
-        startedAt: String(test?.startedAtIso || "").trim(),
-        endedAt: String(test?.endedAtIso || "").trim(),
-      },
-    }))
-    .filter((item) => item.meta.testId);
+  const queue = getAbXwayQueueItems(filteredTests);
   const total = queue.length;
+  if (!total) {
+    grid.innerHTML = "";
+    renderAbXwayFunnelStatus(statusNode, "Нет тестов");
+    return;
+  }
+  const pendingMessage = force ? "Обновляю XWAY…" : "Считаю XWAY…";
+
+  if (reset) {
+    queue.forEach((item) => setAbXwayChecksOnTest(item.meta.testId, null));
+    renderAbXwayFunnelPending(grid, statusNode, filteredTests, cabinetOrder, total, pendingMessage);
+  } else {
+    renderAbXwayFunnelStatus(statusNode, `${pendingMessage} 0 / ${total}`);
+  }
 
   const repaint = () => {
     if (runId !== abXwaySummaryState.funnelRunId || typeof renderAbFunnelCardsHtml !== "function") {
@@ -417,7 +573,7 @@ async function hydrateAbXwayFunnelDashboard() {
     const cards = abBuildCabinetFunnelCards(filteredTests, cabinetOrder, "xway");
     grid.innerHTML = renderAbFunnelCardsHtml(cards, "xway");
     if (done < total) {
-      renderAbXwayFunnelStatus(statusNode, `Считаю XWAY… ${done} / ${total}`);
+      renderAbXwayFunnelStatus(statusNode, `${pendingMessage} ${done} / ${total}`);
       return;
     }
     if (errors && !ready) {
@@ -437,7 +593,7 @@ async function hydrateAbXwayFunnelDashboard() {
       if (!item || runId !== abXwaySummaryState.funnelRunId) {
         continue;
       }
-      const result = await resolveAbXwaySummaryForMeta(item.meta);
+      const result = await resolveAbXwaySummaryForMeta(item.meta, { force });
       if (runId !== abXwaySummaryState.funnelRunId) {
         continue;
       }
@@ -448,6 +604,7 @@ async function hydrateAbXwayFunnelDashboard() {
         setAbXwayChecksOnTest(item.meta.testId, result.checks);
       } else {
         errors += 1;
+        setAbXwayChecksOnTest(item.meta.testId, null);
       }
       repaint();
     }
@@ -456,6 +613,74 @@ async function hydrateAbXwayFunnelDashboard() {
   await Promise.all(
     Array.from({ length: Math.min(abXwaySummaryState.concurrency, queue.length || 1) }, () => worker()),
   );
+}
+
+async function refreshSingleAbXwaySummary(button) {
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const meta = getAbXwayRequestMeta(button);
+  if (!meta.testId) {
+    return;
+  }
+
+  const containers = getAbXwaySummaryContainers(new Set([meta.testId]));
+  containers.forEach((container) => renderAbXwaySummaryPending(container, "Обновляю XWAY…"));
+  invalidateAbXwayCacheForMeta(meta);
+  setAbXwayChecksOnTest(meta.testId, null);
+  setAbXwayActionLoading(button, true);
+
+  try {
+    const result = await resolveAbXwaySummaryForMeta(meta, { force: true });
+    if (result?.status === "ready") {
+      setAbXwayChecksOnTest(meta.testId, result.checks);
+      containers.forEach((container) => renderAbXwaySummaryReady(container, result.checks));
+    } else {
+      setAbXwayChecksOnTest(meta.testId, null);
+      containers.forEach((container) => renderAbXwaySummaryError(container, result?.error || "Не удалось получить данные XWAY."));
+    }
+    await hydrateAbXwayFunnelDashboard();
+  } finally {
+    setAbXwayActionLoading(button, false);
+  }
+}
+
+async function refreshAbXwayFilteredResults(button) {
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const filteredTests = getAbFilteredXwayTests();
+  const queue = getAbXwayQueueItems(filteredTests);
+  if (!queue.length) {
+    return;
+  }
+
+  const testIds = new Set(queue.map((item) => item.meta.testId));
+  queue.forEach((item) => {
+    invalidateAbXwayCacheForMeta(item.meta);
+    setAbXwayChecksOnTest(item.meta.testId, null);
+  });
+  getAbXwaySummaryContainers(testIds).forEach((container) => renderAbXwaySummaryPending(container, "Обновляю XWAY…"));
+  setAbXwayActionLoading(button, true);
+
+  try {
+    await Promise.all([
+      hydrateVisibleAbXwaySummaries({
+        force: true,
+        testIds,
+        pendingMessage: "Обновляю XWAY…",
+      }),
+      hydrateAbXwayFunnelDashboard({
+        force: true,
+        reset: true,
+        tests: filteredTests,
+      }),
+    ]);
+  } finally {
+    setAbXwayActionLoading(button, false);
+  }
 }
 
 function ensureAbXwayOverlay() {
@@ -730,7 +955,7 @@ function renderAbXwayOverlayData(button, payload) {
   const exportChecks = getAbExportSummaryChecks(testId);
   const xwayChecks = getAbXwaySummaryChecks(testId, payload);
   overlay.title.textContent = `XWAY • Тест ${testId}`;
-  overlay.meta.textContent = `Тип РК: ${campaignType}${campaignExternalId ? ` · ID РК: ${campaignExternalId}` : ""} · До: ${beforeDate} - ${beforeDate} · После: ${afterDate} - ${afterDate}`;
+  overlay.meta.textContent = `Тип РК: ${campaignType}${campaignExternalId ? ` · ID РК: ${campaignExternalId}` : ""} · До: ${beforeDate} · После: ${afterDate}`;
 
   const rows = Array.isArray(payload?.metrics) ? payload.metrics : [];
   const campaignsBefore = Array.isArray(payload?.matchedCampaigns?.before) ? payload.matchedCampaigns.before : [];
@@ -815,8 +1040,16 @@ async function openAbXwayOverlay(button) {
   renderAbXwayOverlayLoading(button);
 
   try {
-    const payload = await requestAbXwayPayload(getAbXwayRequestMeta(button));
-    renderAbXwayOverlayData(button, payload);
+    const meta = getAbXwayRequestMeta(button);
+    const cached = abXwaySummaryState.cache.get(buildAbXwayRequestKey(meta));
+    const result = await resolveAbXwaySummaryForMeta(meta, {
+      force: cached?.status === "error",
+    });
+    if (result?.status === "ready") {
+      renderAbXwayOverlayData(button, result.payload);
+      return;
+    }
+    renderAbXwayOverlayError(button, result?.error || "Не удалось получить данные XWAY.");
   } catch (error) {
     renderAbXwayOverlayError(button, error instanceof Error ? error.message : "Не удалось получить данные XWAY.");
   }

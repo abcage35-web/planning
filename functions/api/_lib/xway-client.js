@@ -2,6 +2,39 @@ import { XWAY_FALLBACK_STORAGE_STATE } from "./xway-storage-state.js";
 
 const XWAY_BASE_URL = "https://am.xway.ru";
 const XWAY_AB_TESTS_REFERER = `${XWAY_BASE_URL}/wb/ab-tests`;
+const XWAY_RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+function wait(durationMs) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(durationMs) || 0)));
+}
+
+function isXwayRetryableStatus(statusRaw) {
+  return XWAY_RETRYABLE_STATUSES.has(Number(statusRaw) || 0);
+}
+
+function isXwayRetryableError(error) {
+  if (!error) {
+    return false;
+  }
+  if (isXwayRetryableStatus(error.status)) {
+    return true;
+  }
+  const message = String(error instanceof Error ? error.message : error || "").toLowerCase();
+  return (
+    message.includes("fetch")
+    || message.includes("network")
+    || message.includes("timeout")
+    || message.includes("502")
+    || message.includes("503")
+    || message.includes("504")
+  );
+}
+
+function buildXwayResponseError(status, message) {
+  const error = new Error(message);
+  error.status = Number(status) || 0;
+  return error;
+}
 
 function safeJsonParse(textRaw) {
   try {
@@ -99,27 +132,44 @@ export async function xwayFetchJson(env, pathOrUrl, options = {}) {
     body = JSON.stringify(body);
   }
 
-  const response = await fetch(url, {
-    method,
-    headers,
-    body,
-    redirect: "follow",
-  });
+  const retries = Math.max(0, Number(options.retries ?? 2) || 0);
+  const retryDelayMs = Math.max(150, Number(options.retryDelayMs) || 350);
+  let lastError = null;
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`XWAY ${response.status}: ${text.slice(0, 300)}`);
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body,
+        redirect: "follow",
+      });
+
+      const text = response.status === 204 ? "" : await response.text();
+      if (!response.ok) {
+        throw buildXwayResponseError(response.status, `XWAY ${response.status}: ${text.slice(0, 300)}`);
+      }
+
+      if (response.status === 204 || !text.trim()) {
+        return null;
+      }
+
+      const parsed = safeJsonParse(text);
+      if (parsed === null && text.trim().toLowerCase() !== "null") {
+        throw buildXwayResponseError(response.status, "XWAY вернул невалидный JSON.");
+      }
+      return parsed;
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries && isXwayRetryableError(error)) {
+        await wait(retryDelayMs * (attempt + 1));
+        continue;
+      }
+      throw error;
+    }
   }
 
-  if (response.status === 204) {
-    return null;
-  }
-
-  const text = await response.text();
-  if (!text.trim()) {
-    return null;
-  }
-  return safeJsonParse(text);
+  throw lastError || new Error("XWAY request failed");
 }
 
 export function xwayIsoDateFromDateLike(valueRaw) {

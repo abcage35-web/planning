@@ -275,10 +275,7 @@ function abExtractCampaignExternalId(testTitleRaw) {
   if (!title) {
     return "";
   }
-  const parts = title
-    .split("/")
-    .map((part) => String(part || "").trim())
-    .filter(Boolean);
+  const parts = title.split("/").map((part) => String(part || "").trim());
   if (parts.length < 3) {
     return "";
   }
@@ -1439,7 +1436,13 @@ function renderAbCabinetFunnelDashboard(filteredTests) {
       <section class="ab-funnel-source-section is-xway" data-ab-xway-funnel-section>
         <div class="ab-funnel-source-head">
           <h4>Из XWAY</h4>
-          <span class="ab-stat-chip" data-ab-xway-funnel-status>${hasXwayChecks ? "Готово" : "Считаю XWAY…"}</span>
+          <div class="ab-funnel-source-actions">
+            <span class="ab-stat-chip" data-ab-xway-funnel-status>${hasXwayChecks ? "Готово" : "Считаю XWAY…"}</span>
+            <button type="button" class="ab-head-action-btn ab-xway-refresh-all-btn" data-ab-action="refresh-xway-filtered" aria-label="Обновить XWAY по текущим фильтрам" title="Обновить XWAY по текущим фильтрам">
+              ${abRenderIcon("refresh", "ab-card-help-icon") || "↻"}
+              <span>Обновить XWAY</span>
+            </button>
+          </div>
         </div>
         <div class="ab-funnel-grid" data-ab-xway-funnel-grid>${xwayCardsHtml}</div>
       </section>
@@ -1667,6 +1670,20 @@ function renderAbTestCard(test) {
               ${reportHtml}
             </div>
           </div>
+          <button
+            type="button"
+            class="ab-icon-btn ab-head-action-btn"
+            data-ab-action="refresh-xway-summary"
+            data-ab-test-id="${abEscapeAttr(test.testId)}"
+            data-ab-campaign-type="${abEscapeAttr(test.type || "")}"
+            data-ab-campaign-external-id="${abEscapeAttr(test.campaignExternalId || "")}"
+            data-ab-started-at="${abEscapeAttr(test.startedAtIso || "")}"
+            data-ab-ended-at="${abEscapeAttr(test.endedAtIso || "")}"
+            aria-label="Обновить результат XWAY для теста"
+            title="Обновить результат XWAY для теста"
+          >
+            ${abRenderIcon("refresh", "ab-card-help-icon") || "↻"}
+          </button>
           <button
             type="button"
             class="ab-icon-btn ab-head-action-btn"

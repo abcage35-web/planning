@@ -19,10 +19,7 @@ function parseCampaignTypeFallback(testNameRaw) {
   if (!name) {
     return "";
   }
-  const parts = name
-    .split("/")
-    .map((part) => part.trim())
-    .filter(Boolean);
+  const parts = name.split("/").map((part) => part.trim());
   return parts.length >= 2 ? parts[1].toUpperCase() : "";
 }
 
@@ -31,10 +28,7 @@ function parseCampaignExternalIdFallback(testNameRaw) {
   if (!name) {
     return "";
   }
-  const parts = name
-    .split("/")
-    .map((part) => part.trim())
-    .filter(Boolean);
+  const parts = name.split("/").map((part) => part.trim());
   return parts.length >= 3 ? String(parts[2] || "").trim() : "";
 }
 
