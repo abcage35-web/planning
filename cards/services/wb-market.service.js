@@ -17,6 +17,7 @@
 
   function createEmptyMarketSnapshot() {
     return {
+      cardExists: null,
       stockValue: null,
       inStock: null,
       stockSource: "",
@@ -120,6 +121,7 @@
     const patch = patchRaw && typeof patchRaw === "object" ? patchRaw : createEmptyMarketSnapshot();
 
     const merged = {
+      cardExists: typeof primary.cardExists === "boolean" ? primary.cardExists : null,
       stockValue: Number.isFinite(primary.stockValue) ? Math.max(0, Math.round(primary.stockValue)) : null,
       inStock: typeof primary.inStock === "boolean" ? primary.inStock : null,
       stockSource: String(primary.stockSource || ""),
@@ -131,6 +133,9 @@
       marketError: String(primary.marketError || ""),
     };
 
+    if (merged.cardExists === null && typeof patch.cardExists === "boolean") {
+      merged.cardExists = patch.cardExists;
+    }
     if (!Number.isFinite(merged.stockValue) && Number.isFinite(patch.stockValue)) {
       merged.stockValue = Math.max(0, Math.round(patch.stockValue));
     }
@@ -294,7 +299,11 @@
     const product = products.find((item) => extractNmIdFromEntry(item) === targetNmId) || null;
 
     if (!product || typeof product !== "object") {
-      return createEmptyMarketSnapshot();
+      return {
+        ...createEmptyMarketSnapshot(),
+        cardExists: false,
+        marketError: `${snapshotSource}: карточка не найдена`,
+      };
     }
 
     const stock = extractStockFromCardV4Product(product);
@@ -303,6 +312,7 @@
     const rating = toFiniteNumber(ratingRaw);
     const reviewCount = extractReviewCountFromCardV4Product(product);
     return {
+      cardExists: true,
       stockValue: stock.stockValue,
       inStock: stock.inStock,
       stockSource: stock.stockValue !== null || typeof stock.inStock === "boolean" ? snapshotSource : "",
@@ -338,6 +348,9 @@
 
   function withCoreMarketWarning(snapshotRaw) {
     const snapshot = snapshotRaw && typeof snapshotRaw === "object" ? snapshotRaw : createEmptyMarketSnapshot();
+    if (snapshot.cardExists === false) {
+      return snapshot;
+    }
     const missing = buildMissingMarketFields(snapshot);
     const hasCoreGap = missing.includes("остаток") || missing.includes("цена");
     const normalizedError = String(snapshot.marketError || "").trim().toLowerCase();
@@ -358,6 +371,7 @@
     }
 
     const snapshot = mergeMarketSnapshots(createEmptyMarketSnapshot(), payload.snapshot);
+    snapshot.cardExists = typeof payload.snapshot.cardExists === "boolean" ? payload.snapshot.cardExists : null;
     if (snapshot.stockSource) {
       snapshot.stockSource = "card-v4";
     }
@@ -471,6 +485,10 @@
       reconnectConfig,
     );
 
+    if (backend.snapshot?.cardExists === false) {
+      return backend.snapshot;
+    }
+
     if (hasCoreMarketData(backend.snapshot)) {
       return backend.snapshot;
     }
@@ -482,6 +500,10 @@
       fastConfig,
       reconnectConfig,
     );
+
+    if (direct.snapshot?.cardExists === false) {
+      return direct.snapshot;
+    }
 
     if (hasAnyMarketData(direct.snapshot) || hasAnyMarketData(backend.snapshot)) {
       return withCoreMarketWarning(mergeMarketSnapshots(backend.snapshot, direct.snapshot));

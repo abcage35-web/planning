@@ -1184,15 +1184,21 @@ async function fetchCardPayload(nmIdRaw, options = {}) {
     ? fetchCardMarketSnapshot(nmId, { requestSignal, fastFail: marketFastFail })
     : Promise.resolve(createEmptyMarketSnapshot());
 
+  const marketSnapshot = await marketSnapshotPromise;
+  if (requestSignal && requestSignal.aborted) {
+    throw new Error("Обновление остановлено пользователем");
+  }
+  if (marketSnapshot?.cardExists === false) {
+    throw new Error("Карточка не существует на WB");
+  }
+
   const loadByHost = async (hostSuffix) => {
     const base = `https://basket-${hostSuffix}.wbbasket.ru/vol${vol}/part${part}/${nmId}`;
-    const cardPromise = fetchJson(
+    const card = await fetchJson(
       `${base}/info/ru/card.json`,
       { signal: requestSignal },
       { attempts: 2, timeoutMs: FAST_CARD_FETCH_TIMEOUT_MS },
     );
-
-    const [card, marketSnapshot] = await Promise.all([cardPromise, marketSnapshotPromise]);
     if (requestSignal && requestSignal.aborted) {
       throw new Error("Обновление остановлено пользователем");
     }
@@ -1241,7 +1247,6 @@ async function fetchCardPayload(nmIdRaw, options = {}) {
   const hostSuffix = resolved.hostSuffix;
   const base = resolved.base;
   const card = resolved.card;
-  const marketSnapshot = resolved.marketSnapshot;
 
   const hasSellerRecommendations = card?.has_seller_recommendations === true;
   const hasRich = card?.has_rich === true;
@@ -1327,6 +1332,7 @@ async function fetchCardPayload(nmIdRaw, options = {}) {
     hasAutoplay: card?.media?.is_autoplaying_video === true,
     hasTags: toNullableBoolean(card?.enable_tags),
     coverSlideDuplicate,
+    cardExists: typeof marketSnapshot.cardExists === "boolean" ? marketSnapshot.cardExists : null,
     colorNmIds,
     colorCount: colorNmIds.length,
     slides,
@@ -1370,6 +1376,7 @@ async function fetchCardMarketSnapshot(nmIdRaw, options = {}) {
 
 function createEmptyMarketSnapshot() {
   return {
+    cardExists: null,
     stockValue: null,
     inStock: null,
     stockSource: "",
@@ -1398,6 +1405,7 @@ function normalizeRowData(dataRaw) {
   }
 
   const data = { ...dataRaw };
+  data.cardExists = typeof data.cardExists === "boolean" ? data.cardExists : null;
   data.hasSellerRecommendations = data.hasSellerRecommendations === true;
   data.hasAutoplay = data.hasAutoplay === true;
   data.richDetails = normalizeRichDetails(data.richDetails);

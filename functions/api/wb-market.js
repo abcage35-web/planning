@@ -56,6 +56,7 @@ function toRubFromMinorUnits(valueRaw) {
 
 function createEmptyMarketSnapshot() {
   return {
+    cardExists: null,
     stockValue: null,
     inStock: null,
     stockSource: "",
@@ -206,7 +207,11 @@ function extractMarketSnapshotFromCardV4(payload, nmIdRaw) {
   const products = Array.isArray(payload?.products) ? payload.products : [];
   const product = products.find((item) => extractNmIdFromEntry(item) === targetNmId) || null;
   if (!product || typeof product !== "object") {
-    return createEmptyMarketSnapshot();
+    return {
+      ...createEmptyMarketSnapshot(),
+      cardExists: false,
+      marketError: "card-v4: карточка не найдена",
+    };
   }
 
   const stock = extractStockFromCardV4Product(product);
@@ -216,6 +221,7 @@ function extractMarketSnapshotFromCardV4(payload, nmIdRaw) {
   const reviewCount = extractReviewCountFromCardV4Product(product);
 
   return {
+    cardExists: true,
     stockValue: stock.stockValue,
     inStock: stock.inStock,
     stockSource: stock.stockValue !== null || typeof stock.inStock === "boolean" ? "card-v4" : "",
@@ -406,9 +412,11 @@ export async function onRequestGet(context) {
   }
 
   const snapshot = extractMarketSnapshotFromCardV4(fetched.payload, nmId);
-  const missingFields = getMissingMarketFields(snapshot);
-  if (missingFields.length > 0) {
-    snapshot.marketError = `card-v4: не получены поля: ${missingFields.join(", ")}`;
+  if (snapshot.cardExists !== false) {
+    const missingFields = getMissingMarketFields(snapshot);
+    if (missingFields.length > 0) {
+      snapshot.marketError = `card-v4: не получены поля: ${missingFields.join(", ")}`;
+    }
   }
 
   return json({
