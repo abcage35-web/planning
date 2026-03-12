@@ -1220,6 +1220,8 @@ async function fetchCardPayload(nmIdRaw, options = {}) {
         part,
         forceProbe: forceHostProbe,
         requestSignal,
+        marketSnapshot,
+        marketFastFail,
       }),
     );
   } catch (error) {
@@ -1236,6 +1238,8 @@ async function fetchCardPayload(nmIdRaw, options = {}) {
         part,
         forceProbe: true,
         requestSignal,
+        marketSnapshot,
+        marketFastFail,
       }),
     );
   }
@@ -1590,7 +1594,35 @@ function normalizeCardCode(valueRaw) {
   return value.replace(/\s+/g, "").slice(0, 36).toUpperCase();
 }
 
-async function resolveBasketHost({ nmId, vol, part, forceProbe = false, requestSignal = null }) {
+async function resolveBasketHost({
+  nmId,
+  vol,
+  part,
+  forceProbe = false,
+  requestSignal = null,
+  marketSnapshot = null,
+  marketFastFail = false,
+}) {
+  let checkedMarketSnapshot =
+    marketSnapshot && typeof marketSnapshot === "object" ? marketSnapshot : null;
+
+  if (checkedMarketSnapshot?.cardExists === false) {
+    throw new Error("Карточка не существует на WB");
+  }
+
+  if (checkedMarketSnapshot?.cardExists !== true) {
+    checkedMarketSnapshot = await fetchCardMarketSnapshot(nmId, {
+      requestSignal,
+      fastFail: marketFastFail,
+    });
+    if (requestSignal && requestSignal.aborted) {
+      throw new Error("Обновление остановлено пользователем");
+    }
+    if (checkedMarketSnapshot?.cardExists === false) {
+      throw new Error("Карточка не существует на WB");
+    }
+  }
+
   const volKey = String(vol);
   const cached = state.basketByVol[volKey];
 
