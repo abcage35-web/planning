@@ -1,22 +1,22 @@
 :root {
-  --bg: #f3f0e8;
-  --panel: rgba(255, 253, 249, 0.9);
-  --panel-border: rgba(32, 53, 67, 0.15);
-  --ink: #1a2932;
-  --muted: #5d6b75;
-  --accent: #00758f;
-  --accent-strong: #004d63;
-  --ok: #22836f;
-  --bad: #bf3e2c;
-  --warn: #ad6f1a;
-  --radius: 16px;
-  --shadow: 0 16px 50px rgba(20, 38, 48, 0.15);
+  --bg: #f8f9fb;
+  --panel: rgba(255, 255, 255, 0.9);
+  --panel-border: rgba(148, 163, 184, 0.22);
+  --ink: #0f172a;
+  --muted: #64748b;
+  --accent: #0d9488;
+  --accent-strong: #0f766e;
+  --ok: #10b981;
+  --bad: #f97316;
+  --warn: #f59e0b;
+  --radius: 24px;
+  --shadow: 0 30px 90px -46px rgba(15, 23, 42, 0.44);
   --listing-thumb-max: 46px;
   --global-filter-offset: 0px;
   --scrollbar-size: 6px;
-  --scrollbar-track: rgba(26, 41, 50, 0.05);
-  --scrollbar-thumb: rgba(26, 41, 50, 0.22);
-  --scrollbar-thumb-hover: rgba(26, 41, 50, 0.34);
+  --scrollbar-track: rgba(148, 163, 184, 0.12);
+  --scrollbar-thumb: rgba(71, 85, 105, 0.26);
+  --scrollbar-thumb-hover: rgba(51, 65, 85, 0.42);
   --overlay-note-gap: 12px;
   --overlay-note-font-size: 12px;
   --global-head-control-height: 36px;
@@ -65,19 +65,32 @@ html {
 }
 
 body {
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-family: "Inter", "Segoe UI", sans-serif;
   color: var(--ink);
-  background: radial-gradient(circle at 20% 0%, #fff2d9 0%, transparent 35%),
-    radial-gradient(circle at 80% 20%, #d7f0ef 0%, transparent 38%),
-    linear-gradient(160deg, #f8f5ef, #ecebe2 58%, #e5ebea);
+  background: radial-gradient(circle at 0% 0%, rgba(147, 197, 253, 0.22) 0%, transparent 34%),
+    radial-gradient(circle at 88% 10%, rgba(165, 243, 252, 0.2) 0%, transparent 38%),
+    radial-gradient(circle at 38% 100%, rgba(196, 181, 253, 0.12) 0%, transparent 34%),
+    linear-gradient(180deg, #fbfcfe 0%, #f1f5f9 100%);
   line-height: 1.35;
-  padding: 12px;
+  padding: 16px 12px 20px;
   position: relative;
 }
 
 html[data-embed="1"] body {
   padding: 0;
-  background: linear-gradient(180deg, #fbfcfe 0%, #f4f7fb 100%);
+  background: linear-gradient(180deg, #fbfcfe 0%, #f1f5f9 100%);
+}
+
+html.dark body {
+  color: #e2e8f0;
+  background: radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.18) 0%, transparent 32%),
+    radial-gradient(circle at 92% 8%, rgba(20, 184, 166, 0.16) 0%, transparent 34%),
+    radial-gradient(circle at 34% 100%, rgba(99, 102, 241, 0.12) 0%, transparent 30%),
+    linear-gradient(180deg, #020617 0%, #0f172a 100%);
+}
+
+html.dark[data-embed="1"] body {
+  background: linear-gradient(180deg, #020617 0%, #0f172a 100%);
 }
 
 html[data-embed="1"] .ambient,
@@ -96,16 +109,16 @@ html[data-embed="1"] .page-switch-panel {
 .ambient-a {
   width: 320px;
   height: 320px;
-  background: #1f8ea5;
-  top: -80px;
-  right: -70px;
+  background: rgba(56, 189, 248, 0.72);
+  top: -120px;
+  right: -90px;
 }
 
 .ambient-b {
   width: 260px;
   height: 260px;
-  background: #e3644a;
-  bottom: -100px;
+  background: rgba(45, 212, 191, 0.44);
+  bottom: -120px;
   left: -80px;
 }
 
@@ -6036,4 +6049,849 @@ tbody tr:hover {
   .ab-variant-matrix {
     min-width: 640px;
   }
+}
+
+/* AB dashboard visual alignment overrides */
+body,
+button,
+input,
+textarea,
+select {
+  font-family: "Inter", "Segoe UI", sans-serif;
+}
+
+[class^="global-"],
+[class*=" global-"],
+[class^="agreement-"],
+[class*=" agreement-"],
+[class^="auth-"],
+[class*=" auth-"],
+[class^="seller-"],
+[class*=" seller-"],
+[class^="bulk-progress-"],
+[class*=" bulk-progress-"],
+[class^="table-"],
+[class*=" table-"],
+[class^="rows-"],
+[class*=" rows-"],
+[class^="page-"],
+[class*=" page-"],
+[class^="btn"],
+[class*=" btn"],
+.hint,
+.subtle,
+.pill,
+.rec-pill,
+.hero-meta,
+.field span,
+.stock-note,
+.price-old,
+.empty-cell {
+  font-family: "Inter", "Segoe UI", sans-serif;
+}
+
+.mono,
+.auth-user-label,
+.global-filters-summary-value,
+.agreement-breakdown-count,
+.agreement-cabinet-quick-filter-count,
+.agreement-problem-cabinet-subtle,
+.agreement-problem-cabinet-value,
+.agreement-problem-cabinet-problems,
+.agreement-problem-cabinet-articles,
+.agreement-problem-cabinet-slash,
+.agreement-problem-cabinet-meta,
+.page-info,
+.bulk-progress-percent {
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+h1,
+.auth-card h2,
+.agreement-block-head h2,
+.agreement-total-value,
+.agreement-card-count,
+.seller-chip-plus,
+.bulk-progress-title {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  letter-spacing: -0.04em;
+}
+
+.ambient {
+  filter: blur(18px);
+  opacity: 0.2;
+}
+
+.panel,
+.controls,
+.table-panel,
+.autoplay-quota-panel,
+.presets-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.9));
+  border-color: rgba(226, 232, 240, 0.94);
+  border-radius: 28px;
+  box-shadow: 0 28px 90px -44px rgba(15, 23, 42, 0.34);
+  backdrop-filter: blur(18px);
+}
+
+.page-switch-panel {
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.page-switch-row {
+  padding: 6px;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 18px 36px -26px rgba(15, 23, 42, 0.2);
+}
+
+.page-switch-btn {
+  min-height: 38px;
+  border-radius: 14px;
+  color: #475569;
+  font: 700 14px/1 "Inter", sans-serif;
+}
+
+.page-switch-btn:hover {
+  background: rgba(15, 148, 136, 0.08);
+  border-color: rgba(45, 212, 191, 0.36);
+  color: #0f172a;
+}
+
+.page-switch-btn.is-active {
+  background: linear-gradient(180deg, #14b8a6 0%, #0f766e 100%);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 16px 26px -18px rgba(15, 118, 110, 0.65);
+}
+
+.startup-loading {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.6) 100%);
+  backdrop-filter: blur(6px);
+}
+
+.startup-loading-card,
+.auth-status,
+.seller-chip {
+  border-color: rgba(226, 232, 240, 0.94);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 20px 50px -34px rgba(15, 23, 42, 0.26);
+}
+
+.startup-loading-text,
+.auth-user-label,
+.agreement-breakdown-name,
+.agreement-card-hint,
+.hint,
+.subtle,
+.controls-subtle,
+.stock-note,
+.price-old,
+.agreement-total-meta-pill,
+.agreement-problem-cabinets-head,
+.agreement-card-count-subtle {
+  color: #64748b;
+}
+
+.global-filters-frame {
+  margin-top: 0;
+  padding: 14px 16px;
+  top: 10px;
+  border-radius: 28px;
+}
+
+.global-filters-head {
+  align-items: flex-start;
+  gap: 12px 16px;
+}
+
+.global-filters-summary {
+  gap: 8px;
+}
+
+.global-filters-summary-chip,
+.seller-chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(203, 213, 225, 0.92);
+  background: rgba(248, 250, 252, 0.94);
+  color: #475569;
+  font: 600 13px/1 "Inter", sans-serif;
+}
+
+.seller-chip a,
+.wb-link,
+.ab-product-test-link,
+.global-filters-summary-value,
+.global-count-mode-label.is-active,
+.global-count-mode-caption,
+.eyebrow,
+.controls h2,
+.agreement-total-label {
+  color: #0f766e;
+}
+
+.global-filters-summary-value {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(20, 184, 166, 0.1);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.global-filters-head-actions {
+  gap: 10px;
+}
+
+.global-head-article-filter {
+  min-width: 260px;
+}
+
+.global-filter-group,
+.global-count-mode-box {
+  border-color: rgba(226, 232, 240, 0.94);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.global-filter-group {
+  padding: 12px 14px;
+}
+
+.global-count-mode-box {
+  padding: 8px 12px;
+}
+
+.global-filter-group-title,
+.field span,
+.autoplay-limit-control > span,
+.rows-limit-control,
+.table-sort-control,
+.agreement-breakdown-title {
+  color: #64748b;
+  font: 700 11px/1.1 "Inter", sans-serif;
+  letter-spacing: 0.12em;
+}
+
+input,
+textarea,
+select,
+.filter-input,
+.filter-select {
+  border: 1px solid rgba(203, 213, 225, 0.92);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+  box-shadow: inset 0 1px 1px rgba(148, 163, 184, 0.08);
+}
+
+select,
+select option,
+select optgroup {
+  font-family: "Inter", "Segoe UI", sans-serif;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid rgba(45, 212, 191, 0.18);
+  border-color: rgba(20, 184, 166, 0.68);
+}
+
+.btn,
+.agreement-head-chart-btn,
+.agreement-stock-toggle,
+.agreement-card-filter,
+.agreement-icon-btn,
+.agreement-reset-btn,
+.agreement-cabinet-quick-filter,
+.page-btn,
+.bulk-progress-cancel {
+  border: 1px solid rgba(203, 213, 225, 0.92);
+  background: rgba(255, 255, 255, 0.96);
+  color: #334155;
+  border-radius: 16px;
+  font: 700 13px/1 "Inter", sans-serif;
+  box-shadow: 0 16px 32px -28px rgba(15, 23, 42, 0.3);
+}
+
+.btn:hover,
+.agreement-head-chart-btn:hover,
+.agreement-stock-toggle:hover,
+.agreement-card-filter:not(.is-active):hover,
+.agreement-icon-btn:hover,
+.agreement-reset-btn:hover,
+.agreement-cabinet-quick-filter:hover,
+.page-btn:hover:not(:disabled),
+.bulk-progress-cancel:hover:not(:disabled) {
+  border-color: rgba(45, 212, 191, 0.42);
+  background: rgba(248, 250, 252, 0.98);
+  color: #0f172a;
+  box-shadow: 0 24px 42px -32px rgba(15, 23, 42, 0.34);
+}
+
+.btn-primary {
+  border-color: transparent;
+  background: linear-gradient(180deg, #14b8a6 0%, #0f766e 100%);
+  color: #ffffff;
+  box-shadow: 0 22px 40px -26px rgba(15, 118, 110, 0.66);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #2dd4bf 0%, #0f766e 100%);
+}
+
+.btn-danger {
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.34);
+  color: #dc2626;
+}
+
+.btn-problem {
+  background: rgba(251, 146, 60, 0.1);
+  border-color: rgba(251, 146, 60, 0.34);
+  color: #c2410c;
+}
+
+.btn-mini,
+.global-filters-head-actions .btn-mini {
+  min-height: 38px;
+  height: auto;
+  padding: 0 14px;
+  border-radius: 14px;
+}
+
+.agreement-dashboard,
+.agreement-block {
+  gap: 16px;
+}
+
+.agreement-block-head {
+  gap: 14px 18px;
+}
+
+.agreement-block-head h2,
+h1 {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.agreement-head-main .subtle,
+.global-count-mode,
+.auth-note,
+.autoplay-quota-meta,
+.agreement-breakdown-meta,
+.agreement-card-percent,
+.agreement-cabinet-quick-filter-name,
+.page-info {
+  color: #64748b;
+}
+
+.agreement-topline {
+  gap: 16px;
+}
+
+.agreement-total,
+.agreement-breakdown {
+  padding: 20px 22px;
+  border-radius: 28px;
+  border: 1px solid rgba(226, 232, 240, 0.94);
+  box-shadow: 0 28px 80px -42px rgba(15, 23, 42, 0.28);
+}
+
+.agreement-total {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(236, 253, 245, 0.92));
+  color: #0f172a;
+}
+
+.agreement-total-alert {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 237, 213, 0.92));
+  border-color: rgba(251, 146, 60, 0.34);
+}
+
+.agreement-total-ok {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(236, 253, 245, 0.92));
+  border-color: rgba(52, 211, 153, 0.32);
+}
+
+.agreement-total-label {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.agreement-total-value {
+  color: #0f172a;
+  font-size: clamp(72px, 7vw, 96px);
+}
+
+.agreement-total-meta-pill {
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(255, 255, 255, 0.78);
+  padding: 6px 10px;
+}
+
+.agreement-breakdown {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92));
+}
+
+.agreement-breakdown-head {
+  gap: 8px 14px;
+}
+
+.agreement-break-rail {
+  height: 20px;
+  background: rgba(226, 232, 240, 0.88);
+}
+
+.agreement-break-tooltip-text,
+.icon-hint-tooltip-text {
+  border-color: rgba(30, 41, 59, 0.3);
+  background: rgba(15, 23, 42, 0.96);
+  color: #f8fafc;
+  box-shadow: 0 24px 48px -30px rgba(2, 6, 23, 0.9);
+}
+
+.agreement-breakdown-count,
+.agreement-card-title,
+.autoplay-quota-cabinet,
+.autoplay-quota-value {
+  color: #0f172a;
+}
+
+.agreement-cards {
+  gap: 14px;
+}
+
+.agreement-card {
+  min-height: 214px;
+  padding: 18px;
+  gap: 10px;
+  border-radius: 24px;
+  border: 1px solid rgba(226, 232, 240, 0.94);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(248, 250, 252, 0.92));
+  box-shadow: 0 24px 70px -44px rgba(15, 23, 42, 0.28);
+}
+
+.agreement-card-has-problem {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(255, 247, 237, 0.92));
+  border-color: rgba(251, 146, 60, 0.3);
+}
+
+.agreement-card-limits {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(239, 246, 255, 0.92));
+  border-color: rgba(96, 165, 250, 0.32);
+}
+
+.agreement-card-limits.agreement-card-has-problem {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(238, 242, 255, 0.92));
+  border-color: rgba(129, 140, 248, 0.34);
+}
+
+.agreement-card-title {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.agreement-card-percent {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.agreement-card-count {
+  color: #f97316;
+  font-size: 56px;
+  font-weight: 800;
+}
+
+.agreement-card-clean .agreement-card-count {
+  color: #0f766e;
+}
+
+.agreement-card-limits .agreement-card-count {
+  color: #2563eb;
+}
+
+.agreement-card-hint {
+  font-size: 14px;
+}
+
+.agreement-card-bar {
+  height: 10px;
+  background: rgba(226, 232, 240, 0.92);
+}
+
+.agreement-card-bar span {
+  background: linear-gradient(90deg, #fb923c, #f97316);
+}
+
+.agreement-card-clean .agreement-card-bar span {
+  background: linear-gradient(90deg, #2dd4bf, #0f766e);
+}
+
+.agreement-card-limits .agreement-card-bar span {
+  background: linear-gradient(90deg, #60a5fa, #2563eb);
+}
+
+.agreement-problem-cabinets {
+  gap: 6px;
+}
+
+.agreement-problem-cabinets-head {
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+.agreement-problem-cabinet-item {
+  padding: 6px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(248, 250, 252, 0.94);
+  color: #334155;
+}
+
+.agreement-problem-cabinet-item.is-warning {
+  border-color: rgba(251, 146, 60, 0.26);
+  background: rgba(255, 247, 237, 0.94);
+  color: #c2410c;
+}
+
+.agreement-problem-cabinet-item.is-over {
+  border-color: rgba(248, 113, 113, 0.26);
+  background: rgba(254, 242, 242, 0.94);
+  color: #b91c1c;
+}
+
+.agreement-card-limits .agreement-problem-cabinet-item {
+  border-color: rgba(191, 219, 254, 0.92);
+  background: rgba(239, 246, 255, 0.94);
+  color: #1e3a8a;
+}
+
+.agreement-card-filter.is-active,
+.agreement-head-chart-btn.is-active,
+.agreement-stock-toggle.is-active,
+.agreement-cabinet-quick-filter.is-active {
+  border-color: rgba(20, 184, 166, 0.32);
+  background: rgba(20, 184, 166, 0.1);
+  color: #0f766e;
+}
+
+.agreement-stock-toggle-switch,
+.global-count-mode-slider {
+  border-color: rgba(148, 163, 184, 0.5);
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.agreement-stock-toggle.is-active .agreement-stock-toggle-switch,
+.global-count-mode-switch input:checked + .global-count-mode-slider {
+  background: rgba(20, 184, 166, 0.42);
+  border-color: rgba(20, 184, 166, 0.54);
+}
+
+.hero-meta,
+.auth-card,
+.bulk-progress-card,
+.autoplay-quota-card,
+.autoplay-quota-empty,
+.agreement-empty {
+  border-color: rgba(226, 232, 240, 0.92);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 60px -44px rgba(15, 23, 42, 0.28);
+}
+
+.controls,
+.table-panel,
+.autoplay-quota-panel {
+  padding: 20px 22px;
+}
+
+.toolbar,
+.controls-head,
+.autoplay-quota-top,
+.table-tools {
+  gap: 12px 14px;
+}
+
+.table-wrap {
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+thead th {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom-color: rgba(226, 232, 240, 0.92);
+  border-right-color: rgba(226, 232, 240, 0.72);
+  color: #475569;
+}
+
+.filters-row th {
+  background: #f8fafc;
+}
+
+tbody td {
+  border-bottom-color: rgba(226, 232, 240, 0.84);
+  border-right-color: rgba(226, 232, 240, 0.6);
+}
+
+tbody tr:hover {
+  background: rgba(20, 184, 166, 0.05);
+}
+
+.article-code-chip,
+.pill-info {
+  border: 1px solid rgba(191, 219, 254, 0.92);
+  background: rgba(239, 246, 255, 0.92);
+  color: #1d4ed8;
+}
+
+.pill-ok {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+.pill-no {
+  background: rgba(248, 113, 113, 0.12);
+  color: #b91c1c;
+}
+
+.pill-na {
+  background: rgba(148, 163, 184, 0.16);
+  color: #475569;
+}
+
+.rec-pill {
+  border-style: solid;
+  border-color: rgba(20, 184, 166, 0.26);
+}
+
+.rec-pill:hover {
+  box-shadow: 0 18px 34px -26px rgba(15, 118, 110, 0.34);
+}
+
+html.dark {
+  --bg: #020617;
+  --panel: rgba(15, 23, 42, 0.88);
+  --panel-border: rgba(51, 65, 85, 0.74);
+  --ink: #e2e8f0;
+  --muted: #94a3b8;
+  --shadow: 0 34px 90px -50px rgba(2, 6, 23, 0.94);
+  --scrollbar-track: rgba(15, 23, 42, 0.36);
+  --scrollbar-thumb: rgba(100, 116, 139, 0.4);
+  --scrollbar-thumb-hover: rgba(148, 163, 184, 0.54);
+}
+
+html.dark .page-switch-row,
+html.dark .panel,
+html.dark .controls,
+html.dark .table-panel,
+html.dark .autoplay-quota-panel,
+html.dark .presets-panel,
+html.dark .global-filter-group,
+html.dark .global-count-mode-box,
+html.dark .agreement-total,
+html.dark .agreement-breakdown,
+html.dark .agreement-card,
+html.dark .hero-meta,
+html.dark .auth-card,
+html.dark .autoplay-quota-card,
+html.dark .table-wrap,
+html.dark .bulk-progress-card,
+html.dark .startup-loading-card,
+html.dark .auth-status,
+html.dark .seller-chip,
+html.dark .agreement-empty,
+html.dark .autoplay-quota-empty {
+  border-color: rgba(51, 65, 85, 0.84);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.86));
+  color: #e2e8f0;
+  box-shadow: 0 30px 80px -44px rgba(2, 6, 23, 0.92);
+}
+
+html.dark .agreement-total-alert {
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(67, 20, 7, 0.64));
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+html.dark .agreement-total-ok {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(4, 120, 87, 0.36));
+  border-color: rgba(45, 212, 191, 0.28);
+}
+
+html.dark .agreement-card-has-problem {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(67, 20, 7, 0.54));
+  border-color: rgba(249, 115, 22, 0.28);
+}
+
+html.dark .agreement-card-limits {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(30, 64, 175, 0.34));
+  border-color: rgba(96, 165, 250, 0.28);
+}
+
+html.dark .agreement-card-limits.agreement-card-has-problem {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(79, 70, 229, 0.32));
+  border-color: rgba(129, 140, 248, 0.32);
+}
+
+html.dark input,
+html.dark textarea,
+html.dark select,
+html.dark .filter-input,
+html.dark .filter-select,
+html.dark .btn,
+html.dark .agreement-head-chart-btn,
+html.dark .agreement-stock-toggle,
+html.dark .agreement-card-filter,
+html.dark .agreement-icon-btn,
+html.dark .agreement-reset-btn,
+html.dark .agreement-cabinet-quick-filter,
+html.dark .page-btn,
+html.dark .bulk-progress-cancel {
+  border-color: rgba(51, 65, 85, 0.84);
+  background: rgba(15, 23, 42, 0.92);
+  color: #e2e8f0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+html.dark .btn:hover,
+html.dark .agreement-head-chart-btn:hover,
+html.dark .agreement-stock-toggle:hover,
+html.dark .agreement-card-filter:not(.is-active):hover,
+html.dark .agreement-icon-btn:hover,
+html.dark .agreement-reset-btn:hover,
+html.dark .agreement-cabinet-quick-filter:hover,
+html.dark .page-btn:hover:not(:disabled),
+html.dark .bulk-progress-cancel:hover:not(:disabled) {
+  background: rgba(30, 41, 59, 0.96);
+  color: #f8fafc;
+}
+
+html.dark .btn-primary {
+  background: linear-gradient(180deg, #14b8a6 0%, #0f766e 100%);
+  color: #ffffff;
+}
+
+html.dark .agreement-block-head h2,
+html.dark h1,
+html.dark .agreement-total-value,
+html.dark .agreement-breakdown-count,
+html.dark .agreement-card-title,
+html.dark .agreement-card-count,
+html.dark .autoplay-quota-cabinet,
+html.dark .autoplay-quota-value,
+html.dark tbody td,
+html.dark .agreement-break-tooltip-title strong {
+  color: #e2e8f0;
+}
+
+html.dark .startup-loading-text,
+html.dark .auth-user-label,
+html.dark .agreement-breakdown-name,
+html.dark .agreement-card-hint,
+html.dark .hint,
+html.dark .subtle,
+html.dark .controls-subtle,
+html.dark .stock-note,
+html.dark .price-old,
+html.dark .agreement-total-meta-pill,
+html.dark .agreement-problem-cabinets-head,
+html.dark .agreement-card-count-subtle,
+html.dark .agreement-head-main .subtle,
+html.dark .global-count-mode,
+html.dark .auth-note,
+html.dark .autoplay-quota-meta,
+html.dark .agreement-breakdown-meta,
+html.dark .agreement-card-percent,
+html.dark .agreement-cabinet-quick-filter-name,
+html.dark .page-info,
+html.dark thead th {
+  color: #94a3b8;
+}
+
+html.dark .global-filters-summary-chip,
+html.dark .seller-chip,
+html.dark .article-code-chip,
+html.dark .pill-info {
+  border-color: rgba(51, 65, 85, 0.84);
+  background: rgba(15, 23, 42, 0.92);
+  color: #cbd5e1;
+}
+
+html.dark .global-filters-summary-value,
+html.dark .seller-chip a,
+html.dark .wb-link,
+html.dark .ab-product-test-link,
+html.dark .global-count-mode-label.is-active,
+html.dark .global-count-mode-caption,
+html.dark .eyebrow,
+html.dark .agreement-total-label {
+  color: #5eead4;
+}
+
+html.dark .agreement-card-clean .agreement-card-count {
+  color: #2dd4bf;
+}
+
+html.dark .agreement-card-limits .agreement-card-count {
+  color: #93c5fd;
+}
+
+html.dark .agreement-card-bar,
+html.dark .agreement-break-rail,
+html.dark .agreement-stock-toggle-switch,
+html.dark .global-count-mode-slider {
+  background: rgba(51, 65, 85, 0.72);
+  border-color: rgba(71, 85, 105, 0.8);
+}
+
+html.dark .agreement-problem-cabinet-item {
+  border-color: rgba(51, 65, 85, 0.76);
+  background: rgba(15, 23, 42, 0.94);
+  color: #cbd5e1;
+}
+
+html.dark .agreement-problem-cabinet-item.is-warning {
+  border-color: rgba(249, 115, 22, 0.24);
+  background: rgba(67, 20, 7, 0.36);
+  color: #fdba74;
+}
+
+html.dark .agreement-problem-cabinet-item.is-over {
+  border-color: rgba(248, 113, 113, 0.24);
+  background: rgba(69, 10, 10, 0.38);
+  color: #fca5a5;
+}
+
+html.dark .agreement-card-limits .agreement-problem-cabinet-item {
+  border-color: rgba(59, 130, 246, 0.22);
+  background: rgba(30, 41, 59, 0.96);
+  color: #bfdbfe;
+}
+
+html.dark thead th {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.92));
+  border-bottom-color: rgba(51, 65, 85, 0.76);
+  border-right-color: rgba(51, 65, 85, 0.58);
+}
+
+html.dark .filters-row th {
+  background: rgba(15, 23, 42, 0.98);
+}
+
+html.dark tbody td {
+  border-bottom-color: rgba(51, 65, 85, 0.7);
+  border-right-color: rgba(51, 65, 85, 0.48);
+}
+
+html.dark tbody tr:hover {
+  background: rgba(20, 184, 166, 0.08);
 }

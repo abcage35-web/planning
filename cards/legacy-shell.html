@@ -7,12 +7,27 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./app.css" />
     <script>
       (() => {
+        const applyTheme = () => {
+          const theme = localStorage.getItem("ab-theme");
+          const isDark = theme === "dark";
+          document.documentElement.classList.toggle("dark", isDark);
+          document.documentElement.dataset.theme = isDark ? "dark" : "light";
+        };
+
+        applyTheme();
+
+        window.addEventListener("storage", (event) => {
+          if (!event.key || event.key === "ab-theme") {
+            applyTheme();
+          }
+        });
+
         const searchParams = new URLSearchParams(window.location.search);
         if (searchParams.get("embed") === "1") {
           document.documentElement.dataset.embed = "1";
