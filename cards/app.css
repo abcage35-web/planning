@@ -75,6 +75,16 @@ body {
   position: relative;
 }
 
+html[data-embed="1"] body {
+  padding: 0;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f4f7fb 100%);
+}
+
+html[data-embed="1"] .ambient,
+html[data-embed="1"] .page-switch-panel {
+  display: none !important;
+}
+
 .ambient {
   position: fixed;
   border-radius: 50%;

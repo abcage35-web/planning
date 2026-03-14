@@ -12,25 +12,10 @@
     />
     <script>
       (() => {
-        const storageKey = "media-plan-theme";
-        let theme = "light";
-
-        try {
-          const savedTheme = localStorage.getItem(storageKey);
-          if (savedTheme === "dark" || savedTheme === "light") {
-            theme = savedTheme;
-          } else if (window.matchMedia?.("(prefers-color-scheme: dark)").matches) {
-            theme = "dark";
-          }
-        } catch {}
-
+        const theme = localStorage.getItem("ab-theme") === "dark" ? "dark" : "light";
         document.documentElement.classList.toggle("dark", theme === "dark");
         document.documentElement.style.colorScheme = theme;
         document.documentElement.dataset.theme = theme;
-
-        try {
-          localStorage.setItem("ab-dashboard-theme", theme);
-        } catch {}
 
         if ("serviceWorker" in navigator) {
           window.addEventListener("pageshow", (event) => {

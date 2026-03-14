@@ -43,6 +43,7 @@ export default defineConfig({
       "@": resolve(__dirname, "src"),
     },
   },
+  assetsInclude: ["**/*.svg", "**/*.csv"],
   build: {
     rollupOptions: {
       input: {

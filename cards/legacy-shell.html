@@ -13,6 +13,11 @@
     <link rel="stylesheet" href="./app.css" />
     <script>
       (() => {
+        const searchParams = new URLSearchParams(window.location.search);
+        if (searchParams.get("embed") === "1") {
+          document.documentElement.dataset.embed = "1";
+        }
+
         window.addEventListener("pageshow", (event) => {
           if (event.persisted) {
             window.location.reload();

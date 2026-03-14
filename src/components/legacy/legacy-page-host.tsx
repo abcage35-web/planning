@@ -63,7 +63,7 @@ export function LegacyPageHost({
             setStatus("ready");
           }
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           if (!cancelled) {
             setStatus("error");
             setErrorMessage(error instanceof Error ? error.message : "Не удалось поднять legacy assets.");
