@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useState } from "https://esm.sh/react@18.3.1";
+import React, { useEffect, useMemo, useRef, useState } from "https://esm.sh/react@18.3.1";
 import { createRoot } from "https://esm.sh/react-dom@18.3.1/client";
 import htm from "https://esm.sh/htm@3.1.1";
 
 const html = htm.bind(React.createElement);
 const Fragment = React.Fragment;
-const noop = () => {};
 
 function getApi() {
   return globalThis.AbDashboardApi || null;
@@ -94,7 +93,121 @@ function SafeLink({ url, label }) {
   </a>`;
 }
 
-function FilterToolbar({ model, filteredTests, store }) {
+function ToolbarSelect({ value, onChange, options, minWidth = 100, ariaLabel = "" }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const selectedLabel = options.find((item) => item.value === value)?.label || value;
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      if (rootRef.current && !rootRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [open]);
+
+  return html`<div className="ab-toolbar-select" ref=${rootRef} style=${{ minWidth: `${minWidth}px` }}>
+    <button
+      type="button"
+      className="ab-toolbar-select-trigger"
+      onClick=${() => setOpen((valueCurrent) => !valueCurrent)}
+      aria-label=${ariaLabel}
+      aria-expanded=${open ? "true" : "false"}
+    >
+      <span className="ab-toolbar-select-value">${selectedLabel}</span>
+      <${IconHtml} name="chevronDown" className=${`ab-toolbar-select-chevron${open ? " is-open" : ""}`} />
+    </button>
+    ${open
+      ? html`<div className="ab-toolbar-select-menu">
+          ${options.map(
+            (option) => html`<button
+              key=${option.value}
+              type="button"
+              className=${`ab-toolbar-select-option${option.value === value ? " is-active" : ""}`}
+              onClick=${() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+            >
+              ${option.label}
+            </button>`,
+          )}
+        </div>`
+      : null}
+  </div>`;
+}
+
+function MonthsDropdown({ availableMonthKeys, selectedMonthKeys, selectedMonthsLabel, onToggle }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      if (rootRef.current && !rootRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [open]);
+
+  return html`<div className="ab-toolbar-select ab-toolbar-months-picker" ref=${rootRef} style=${{ minWidth: "140px" }}>
+    <button
+      type="button"
+      className="ab-toolbar-select-trigger"
+      onClick=${() => setOpen((valueCurrent) => !valueCurrent)}
+      aria-label="Выбрать месяцы"
+      aria-expanded=${open ? "true" : "false"}
+    >
+      <span className="ab-toolbar-select-value">${selectedMonthsLabel}</span>
+      <${IconHtml} name="chevronDown" className=${`ab-toolbar-select-chevron${open ? " is-open" : ""}`} />
+    </button>
+    ${open
+              ? html`<div className="ab-toolbar-select-menu ab-toolbar-select-menu-months">
+          ${availableMonthKeys.map((monthKey) => {
+            const checked = selectedMonthKeys.includes(monthKey);
+            const api = getApi();
+            const label = api?.formatMonthLabel ? api.formatMonthLabel(monthKey) : monthKey;
+            return html`<label key=${monthKey} className="ab-month-option">
+              <span className=${`ab-month-option-check${checked ? " is-checked" : ""}`}>
+                ${checked ? html`<${IconHtml} name="check" className="ab-month-option-check-icon" />` : null}
+              </span>
+              <input
+                type="checkbox"
+                checked=${checked}
+                onChange=${(event) => onToggle(monthKey, event.target.checked)}
+              />
+              <span>${label}</span>
+            </label>`;
+          })}
+        </div>`
+      : null}
+  </div>`;
+}
+
+function StatChip({ label, value, tone = "" }) {
+  return html`<span className=${`ab-stat-chip${tone ? ` is-${tone}` : ""}`}>
+    ${label}: <strong>${value}</strong>
+  </span>`;
+}
+
+function FilterToolbar({ model, filteredTests, store, collapsed, onToggleCollapse }) {
   const api = getApi();
   const filters = store.filters || {};
   const cabinets = Array.isArray(model?.cabinets) ? model.cabinets : [];
@@ -128,6 +241,33 @@ function FilterToolbar({ model, filteredTests, store }) {
         }`
       : "";
 
+  const cabinetOptions = [{ value: "all", label: "Все кабинеты" }].concat(
+    cabinets.map((cabinet) => ({ value: cabinet, label: cabinet })),
+  );
+  const verdictOptions = [
+    { value: "all", label: "Все исходы" },
+    { value: "good", label: "Хорошо" },
+    { value: "bad", label: "Плохо" },
+    { value: "unknown", label: "Нет данных" },
+  ];
+  const limitOptions = (api?.limitOptions || []).map((value) => ({ value: String(value), label: String(value) }));
+
+  const updateFilters = (partial) => {
+    if (api?.setFilters) {
+      api.setFilters(partial);
+    }
+  };
+
+  if (collapsed) {
+    return html`<div className="ab-toolbar-collapsed">
+      <button type="button" className="ab-toolbar-collapsed-btn" onClick=${onToggleCollapse}>
+        <${IconHtml} name="filter" className="ab-card-help-icon" />
+        <span>Фильтры</span>
+        <${IconHtml} name="chevronDown" className="ab-card-help-icon" />
+      </button>
+    </div>`;
+  }
+
   return html`<section className="ab-toolbar-card">
     <div className="ab-toolbar-main">
       <label className="ab-toolbar-search">
@@ -136,109 +276,116 @@ function FilterToolbar({ model, filteredTests, store }) {
           type="search"
           value=${String(filters.search || "")}
           placeholder="Поиск: test id, артикул, название"
-          data-ab-filter="search"
-          onInput=${noop}
-          onChange=${noop}
+          onInput=${(event) => updateFilters({ search: event.target.value || "" })}
         />
       </label>
 
-      <label className="ab-toolbar-field">
-        <select data-ab-filter="cabinet" value=${String(filters.cabinet || "all")} onChange=${noop}>
-          <option value="all">Все кабинеты</option>
-          ${cabinets.map((cabinet) => html`<option key=${cabinet} value=${cabinet}>${cabinet}</option>`)}
-        </select>
-      </label>
+      <${ToolbarSelect}
+        value=${String(filters.cabinet || "all")}
+        onChange=${(value) => updateFilters({ cabinet: value })}
+        options=${cabinetOptions}
+        minWidth=${130}
+        ariaLabel="Выбрать кабинет"
+      />
 
-      <label className="ab-toolbar-field">
-        <select data-ab-filter="verdict" value=${String(filters.verdict || "all")} onChange=${noop}>
-          <option value="all">Все исходы</option>
-          <option value="good">Хорошо</option>
-          <option value="bad">Плохо</option>
-          <option value="unknown">Нет данных</option>
-        </select>
+      <${ToolbarSelect}
+        value=${String(filters.verdict || "all")}
+        onChange=${(value) => updateFilters({ verdict: value })}
+        options=${verdictOptions}
+        minWidth=${120}
+        ariaLabel="Выбрать итог"
+      />
+
+      <label className="ab-toolbar-field is-date">
+        <input
+          type="date"
+          value=${String(filters.dateFrom || "")}
+          onChange=${(event) => updateFilters({ dateFrom: event.target.value || "", monthKeys: [] })}
+        />
       </label>
 
       <label className="ab-toolbar-field is-date">
-        <input type="date" value=${String(filters.dateFrom || "")} data-ab-filter="dateFrom" onChange=${noop} />
+        <input
+          type="date"
+          value=${String(filters.dateTo || "")}
+          onChange=${(event) => updateFilters({ dateTo: event.target.value || "", monthKeys: [] })}
+        />
       </label>
 
-      <label className="ab-toolbar-field is-date">
-        <input type="date" value=${String(filters.dateTo || "")} data-ab-filter="dateTo" onChange=${noop} />
-      </label>
+      <${MonthsDropdown}
+        availableMonthKeys=${availableMonthKeys}
+        selectedMonthKeys=${selectedMonthKeys}
+        selectedMonthsLabel=${selectedMonthsLabel}
+        onToggle=${(monthKey, checked) => {
+          const next = new Set(selectedMonthKeys);
+          if (checked) {
+            next.add(monthKey);
+          } else {
+            next.delete(monthKey);
+          }
+          const nextMonthKeys = Array.from(next).sort();
+          const range = api?.buildDateRangeFromMonthKeys ? api.buildDateRangeFromMonthKeys(nextMonthKeys) : { from: "", to: "" };
+          updateFilters({
+            monthKeys: nextMonthKeys,
+            dateFrom: range.from || "",
+            dateTo: range.to || "",
+          });
+        }}
+      />
 
-      <details className="ab-toolbar-months">
-        <summary className="ab-toolbar-months-summary">${selectedMonthsLabel}</summary>
-        <div className="ab-toolbar-months-panel">
-          ${availableMonthKeys.map((monthKey) => {
-            const checked = selectedMonthKeys.includes(monthKey);
-            const label = api?.formatMonthLabel ? api.formatMonthLabel(monthKey) : monthKey;
-            return html`<label key=${monthKey} className="ab-month-option">
-              <input
-                type="checkbox"
-                data-ab-filter="monthKey"
-                data-ab-month-key=${monthKey}
-                checked=${checked}
-                onChange=${noop}
-              />
-              <span>${label}</span>
-            </label>`;
-          })}
-        </div>
-      </details>
+      <${ToolbarSelect}
+        value=${String(filters.limit || "")}
+        onChange=${(value) => updateFilters({ limit: value })}
+        options=${limitOptions}
+        minWidth=${64}
+        ariaLabel="Выбрать лимит"
+      />
 
-      <label className="ab-toolbar-field">
-        <select data-ab-filter="limit" value=${String(filters.limit || "")} onChange=${noop}>
-          ${(api?.limitOptions || []).map(
-            (value) => html`<option key=${value} value=${String(value)}>${String(value)}</option>`,
-          )}
-        </select>
-      </label>
+      <button type="button" className="ab-toolbar-collapse-btn" onClick=${onToggleCollapse} title="Скрыть фильтры">
+        <${IconHtml} name="chevronUp" className="ab-card-help-icon" />
+      </button>
 
       <div className="ab-toolbar-actions">
         <div className="ab-view-switch" role="tablist" aria-label="Режим просмотра AB">
           <button
             type="button"
             className=${`ab-view-btn${filters.view === "tests" ? " is-active" : ""}`}
-            data-ab-view="tests"
+            onClick=${() => updateFilters({ view: "tests" })}
           >
             По тестам
           </button>
           <button
             type="button"
             className=${`ab-view-btn${filters.view === "products" ? " is-active" : ""}`}
-            data-ab-view="products"
+            onClick=${() => updateFilters({ view: "products" })}
           >
             По товарам
           </button>
           <button
             type="button"
             className=${`ab-view-btn${filters.view === "both" ? " is-active" : ""}`}
-            data-ab-view="both"
+            onClick=${() => updateFilters({ view: "both" })}
           >
             Оба вида
           </button>
         </div>
-        <button type="button" className="btn" data-ab-action="reset-filters">Сбросить</button>
+        <button type="button" className="btn" onClick=${() => api?.resetFilters?.()}>
+          <${IconHtml} name="refresh" className="ab-card-help-icon" />
+          <span>Сбросить</span>
+        </button>
       </div>
     </div>
 
     <div className="ab-toolbar-stats">
-      <span className="ab-stat-chip">
-        Показано: <strong>${api?.formatInt ? api.formatInt(shownTests) : shownTests}</strong> / ${api?.formatInt
-          ? api.formatInt(visibleTests)
-          : visibleTests}
-      </span>
-      <span className="ab-stat-chip">
-        Всего тестов: <strong>${api?.formatInt ? api.formatInt(totalTests) : totalTests}</strong>
-      </span>
-      <span className="ab-stat-chip">
-        Хорошо: <strong>${api?.formatInt ? api.formatInt(filteredGood) : filteredGood}</strong>
-      </span>
-      <span className="ab-stat-chip">
-        Плохо: <strong>${api?.formatInt ? api.formatInt(filteredBad) : filteredBad}</strong>
-      </span>
+      <${StatChip}
+        label="Показано"
+        value=${`${api?.formatInt ? api.formatInt(shownTests) : shownTests} / ${api?.formatInt ? api.formatInt(visibleTests) : visibleTests}`}
+      />
+      <${StatChip} label="Всего тестов" value=${api?.formatInt ? api.formatInt(totalTests) : totalTests} />
+      <${StatChip} label="Хорошо" value=${api?.formatInt ? api.formatInt(filteredGood) : filteredGood} tone="good" />
+      <${StatChip} label="Плохо" value=${api?.formatInt ? api.formatInt(filteredBad) : filteredBad} tone="bad" />
       ${activeStageLabel
-        ? html`<span className="ab-stat-chip">Этап: <strong>${activeStageLabel}</strong></span>`
+        ? html`<${StatChip} label="Этап" value=${activeStageLabel} tone="sky" />`
         : null}
     </div>
   </section>`;
@@ -419,8 +566,11 @@ function FunnelDashboard({ filteredTests, store }) {
   return html`<section className="ab-funnel-dashboard">
     <div className="ab-funnel-dashboard-head">
       <div>
-        <h3>Воронка по кабинетам</h3>
-        <p className="subtle">Статусы по CTR, цене, CTR × CR1 и итоговому решению. Нажмите на этап, чтобы отфильтровать карточки тестов.</p>
+        <h3>Воронка удачных AB-тестов по кабинетам</h3>
+        <p className="subtle">
+          Текущая выборка по выбранным фильтрам. Отдельно показаны расчеты по выгрузке и по XWAY. Клик по этапу
+          отфильтрует тесты.
+        </p>
       </div>
       <div className="ab-funnel-dashboard-controls">
         <div className="ab-funnel-mode-switch" role="tablist" aria-label="Режим графика воронки">
@@ -836,6 +986,7 @@ function StateCard({ loading, error }) {
 
 function DashboardApp() {
   const [version, setVersion] = useState(0);
+  const [filterCollapsed, setFilterCollapsed] = useState(false);
   const api = getApi();
   const store = api?.store || null;
 
@@ -863,8 +1014,8 @@ function DashboardApp() {
     if (!metaEl) {
       return;
     }
-    const fetchedLabel = store.fetchedAt && typeof globalThis.formatDateTime === "function"
-      ? globalThis.formatDateTime(store.fetchedAt)
+    const fetchedLabel = store.fetchedAt && typeof globalThis.AbDashboardUi?.formatDateTime === "function"
+      ? globalThis.AbDashboardUi.formatDateTime(store.fetchedAt)
       : "-";
     metaEl.textContent = api.buildSourceMetaText ? api.buildSourceMetaText(fetchedLabel) : metaEl.textContent;
   }, [api, store, version]);
@@ -915,7 +1066,13 @@ function DashboardApp() {
   }
 
   return html`<${Fragment}>
-    <${FilterToolbar} model=${store.data} filteredTests=${derived.filteredTests} store=${store} />
+    <${FilterToolbar}
+      model=${store.data}
+      filteredTests=${derived.filteredTests}
+      store=${store}
+      collapsed=${filterCollapsed}
+      onToggleCollapse=${() => setFilterCollapsed((valueCurrent) => !valueCurrent)}
+    />
     <div className="ab-source-line">${derived.sourceRowsLabel}</div>
     <${FunnelDashboard} filteredTests=${derived.filteredTests} store=${store} />
     ${derived.showTests ? html`<${TestsSection} tests=${derived.limitedTests} />` : null}

@@ -5,6 +5,14 @@ function renderIcon(name, className = "") {
       return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>`;
     case "search":
       return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`;
+    case "filter":
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>`;
+    case "chevronDown":
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>`;
+    case "chevronUp":
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>`;
+    case "check":
+      return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.5 17 19 7.5"/></svg>`;
     case "info":
       return `<svg${cls} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v6"/><path d="M12 7.5h.01"/></svg>`;
     case "barChart":
@@ -135,6 +143,16 @@ const abXwaySummaryState = {
 const AB_XWAY_ERROR_CACHE_TTL_MS = 60_000;
 const AB_XWAY_REQUEST_RETRIES = 2;
 const AB_XWAY_REQUEST_RETRY_DELAY_MS = 500;
+
+function isAbReactDashboardMode() {
+  return globalThis.__AB_USE_REACT__ === true;
+}
+
+function notifyAbDashboardViewUpdated() {
+  if (typeof globalThis.AbDashboardApi?.notifyUpdated === "function") {
+    globalThis.AbDashboardApi.notifyUpdated();
+  }
+}
 
 function wait(durationMs) {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(durationMs) || 0)));
@@ -443,6 +461,9 @@ async function requestAbXwayPayload(meta, options = {}) {
 }
 
 function renderAbXwaySummaryPending(container, message = "Считаю XWAY…") {
+  if (isAbReactDashboardMode()) {
+    return;
+  }
   const flowNode = container?.querySelector("[data-ab-xway-summary-flow]");
   if (!flowNode) {
     return;
@@ -451,6 +472,9 @@ function renderAbXwaySummaryPending(container, message = "Считаю XWAY…")
 }
 
 function renderAbXwaySummaryError(container, message = "Нет данных XWAY") {
+  if (isAbReactDashboardMode()) {
+    return;
+  }
   const flowNode = container?.querySelector("[data-ab-xway-summary-flow]");
   if (!flowNode) {
     return;
@@ -461,6 +485,9 @@ function renderAbXwaySummaryError(container, message = "Нет данных XWAY
 }
 
 function renderAbXwaySummaryReady(container, checks) {
+  if (isAbReactDashboardMode()) {
+    return;
+  }
   const flowNode = container?.querySelector("[data-ab-xway-summary-flow]");
   if (!flowNode) {
     return;
@@ -521,6 +548,7 @@ async function hydrateVisibleAbXwaySummaries(options = {}) {
   const force = options && options.force === true;
   const targetTestIds = options?.testIds instanceof Set ? options.testIds : null;
   const pendingMessage = String(options?.pendingMessage || (force ? "Обновляю XWAY…" : "Считаю XWAY…")).trim();
+  const reactMode = isAbReactDashboardMode();
   const runId = ++abXwaySummaryState.summaryRunId;
   const containers = getAbXwaySummaryContainers(targetTestIds);
   if (!containers.length) {
@@ -555,6 +583,9 @@ async function hydrateVisibleAbXwaySummaries(options = {}) {
         setAbXwayChecksOnTest(meta.testId, null);
         renderAbXwaySummaryError(container, result?.error || "Не удалось получить данные XWAY.");
       }
+      if (reactMode) {
+        notifyAbDashboardViewUpdated();
+      }
     }
   };
 
@@ -572,6 +603,9 @@ function setAbXwayChecksOnTest(testIdRaw, checks) {
 }
 
 function renderAbXwayFunnelStatus(statusNode, text) {
+  if (isAbReactDashboardMode()) {
+    return;
+  }
   if (!(statusNode instanceof HTMLElement)) {
     return;
   }
@@ -579,6 +613,9 @@ function renderAbXwayFunnelStatus(statusNode, text) {
 }
 
 function renderAbXwayFunnelPending(grid, statusNode, filteredTests, cabinetOrder, total, message) {
+  if (isAbReactDashboardMode()) {
+    return;
+  }
   if (!(grid instanceof HTMLElement) || !(statusNode instanceof HTMLElement)) {
     return;
   }
@@ -599,21 +636,28 @@ async function hydrateAbXwayFunnelDashboard(options = {}) {
   const force = options && options.force === true;
   const reset = options && options.reset === true;
   const providedTests = Array.isArray(options?.tests) ? options.tests : null;
+  const reactMode = isAbReactDashboardMode();
   const grid = document.querySelector("[data-ab-xway-funnel-grid]");
   const statusNode = document.querySelector("[data-ab-xway-funnel-status]");
-  if (!(grid instanceof HTMLElement) || !(statusNode instanceof HTMLElement)) {
+  if (!reactMode && (!(grid instanceof HTMLElement) || !(statusNode instanceof HTMLElement))) {
     return;
   }
 
   if (!abDashboardStore?.data || typeof abFilterTests !== "function" || typeof abBuildCabinetFunnelCards !== "function") {
-    renderAbXwayFunnelStatus(statusNode, "Нет данных");
+    if (!reactMode) {
+      renderAbXwayFunnelStatus(statusNode, "Нет данных");
+    }
     return;
   }
 
   const filteredTests = providedTests || getAbFilteredXwayTests();
   if (!filteredTests.length) {
-    grid.innerHTML = "";
-    renderAbXwayFunnelStatus(statusNode, "Нет тестов");
+    if (!reactMode) {
+      grid.innerHTML = "";
+      renderAbXwayFunnelStatus(statusNode, "Нет тестов");
+    } else {
+      notifyAbDashboardViewUpdated();
+    }
     return;
   }
 
@@ -635,13 +679,26 @@ async function hydrateAbXwayFunnelDashboard(options = {}) {
 
   if (reset) {
     queue.forEach((item) => setAbXwayChecksOnTest(item.meta.testId, null));
-    renderAbXwayFunnelPending(grid, statusNode, filteredTests, cabinetOrder, total, pendingMessage);
+    if (!reactMode) {
+      renderAbXwayFunnelPending(grid, statusNode, filteredTests, cabinetOrder, total, pendingMessage);
+    } else {
+      notifyAbDashboardViewUpdated();
+    }
   } else {
-    renderAbXwayFunnelStatus(statusNode, `${pendingMessage} 0 / ${total}`);
+    if (!reactMode) {
+      renderAbXwayFunnelStatus(statusNode, `${pendingMessage} 0 / ${total}`);
+    }
   }
 
   const repaint = () => {
-    if (runId !== abXwaySummaryState.funnelRunId || typeof renderAbFunnelCardsHtml !== "function") {
+    if (runId !== abXwaySummaryState.funnelRunId) {
+      return;
+    }
+    if (reactMode) {
+      notifyAbDashboardViewUpdated();
+      return;
+    }
+    if (typeof renderAbFunnelCardsHtml !== "function") {
       return;
     }
     const cards = abBuildCabinetFunnelCards(filteredTests, cabinetOrder, "xway");
@@ -703,6 +760,7 @@ async function refreshSingleAbXwaySummary(button) {
   containers.forEach((container) => renderAbXwaySummaryPending(container, "Обновляю XWAY…"));
   invalidateAbXwayCacheForMeta(meta);
   setAbXwayChecksOnTest(meta.testId, null);
+  notifyAbDashboardViewUpdated();
   setAbXwayActionLoading(button, true);
 
   try {
@@ -714,6 +772,7 @@ async function refreshSingleAbXwaySummary(button) {
       setAbXwayChecksOnTest(meta.testId, null);
       containers.forEach((container) => renderAbXwaySummaryError(container, result?.error || "Не удалось получить данные XWAY."));
     }
+    notifyAbDashboardViewUpdated();
     await hydrateAbXwayFunnelDashboard();
   } finally {
     setAbXwayActionLoading(button, false);
@@ -736,6 +795,7 @@ async function refreshAbXwayFilteredResults(button) {
     invalidateAbXwayCacheForMeta(item.meta);
     setAbXwayChecksOnTest(item.meta.testId, null);
   });
+  notifyAbDashboardViewUpdated();
   getAbXwaySummaryContainers(testIds).forEach((container) => renderAbXwaySummaryPending(container, "Обновляю XWAY…"));
   setAbXwayActionLoading(button, true);
 
