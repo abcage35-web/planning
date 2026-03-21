@@ -15,7 +15,7 @@ export function Navigation({ darkMode, onToggleDarkMode }: NavigationProps) {
     { path: "/cards", label: "Карточки товаров", icon: FileText },
   ];
 
-  const xwayUrl = "https://am.xway.ru/login?token=2b237c153732751d0c6bb9fd9714a8421b6258a158afdd2c2cfb36f63b57a438&uuid=839efc29-991f-432d-ab5e-4112880b24db";
+  const xwayUrl = "https://am.xway.ru/wb/ab-tests";
 
   return (
     <nav className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-2 shadow-sm mb-4">
