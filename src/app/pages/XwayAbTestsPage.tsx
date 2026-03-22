@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Database, Loader2, RefreshCw } from "lucide-react";
 
 import {
@@ -16,6 +16,7 @@ import {
   type XwayPayload,
 } from "../components/ab-service";
 import { FilterToolbar } from "../components/FilterToolbar";
+import { ProductGroupsWithTests } from "../components/ProductGroupsWithTests";
 import { ProductsTable } from "../components/ProductsTable";
 import { TestCardComponent } from "../components/TestCard";
 import { XwayFunnelDashboard } from "../components/XwayFunnelDashboard";
@@ -492,14 +493,19 @@ export function XwayAbTestsPage() {
   const limitedTests = filteredTests.slice(0, testLimit);
   const groupedProducts = buildProducts(filteredTests);
   const filteredProducts = mergeProductSnapshots(groupedProducts, productSnapshotsByKey);
+  const limitedProducts = useMemo(
+    () => mergeProductSnapshots(buildProducts(limitedTests), productSnapshotsByKey),
+    [limitedTests, productSnapshotsByKey],
+  );
 
-  const showTests = filters.view === "tests" || filters.view === "both";
-  const showProducts = filters.view === "products" || filters.view === "both";
+  const showTests = filters.view === "tests";
+  const showProducts = filters.view === "products";
+  const showBoth = filters.view === "both";
 
   useEffect(() => {
-    if (!showProducts || !groupedProducts.length) return;
+    if ((!showProducts && !showBoth) || !groupedProducts.length) return;
     void hydrateProductSnapshots(groupedProducts);
-  }, [groupedProducts, hydrateProductSnapshots, showProducts]);
+  }, [groupedProducts, hydrateProductSnapshots, showBoth, showProducts]);
 
   const sourceRowsLabel = model
     ? `Тестов в XWAY: ${abFormatInt(model.total)} · карточек со снапшотом обложек: ${abFormatInt(model.rowCounts.technical)} · показов в выборке: ${abFormatInt(model.liveTotals.views)}`
@@ -638,6 +644,23 @@ export function XwayAbTestsPage() {
           ) : null}
 
           {showProducts ? <ProductsTable products={filteredProducts} /> : null}
+
+          {showBoth ? (
+            <ProductGroupsWithTests
+              products={limitedProducts}
+              stickyOffsetClassName={filterCollapsed ? "top-[54px]" : "top-[122px]"}
+              renderTest={(test) => (
+                <TestCardComponent
+                  test={test}
+                  xwayStatus={xwayStatusByTestId[test.testId]}
+                  onRefreshXway={handleRefreshSingleXway}
+                  onOpenXwayMetrics={() => {}}
+                  summaryLayout="xway-only"
+                  showXwayMetricsButton={false}
+                />
+              )}
+            />
+          ) : null}
         </>
       ) : null}
     </div>
