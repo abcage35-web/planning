@@ -295,23 +295,37 @@ function getProblemCabinetsWithEmpty(rows = state.rows) {
   return cabinets;
 }
 
-function buildProblemSnapshot(rows = state.rows, options = {}) {
+function isStockPositiveProblemRow(row) {
+  return Number.isFinite(row?.stockValue) && row.stockValue > 0;
+}
+
+function buildProblemSnapshotScope(rows = []) {
   const sourceRows = Array.isArray(rows) ? rows : [];
   const stats = getProblemStats(sourceRows);
-  const totalProblems = getTotalProblemsValue(stats);
+  return {
+    totalRows: sourceRows.length,
+    loadedRows: sourceRows.filter((row) => row.data && !row.error).length,
+    errorRows: sourceRows.filter((row) => Boolean(row.error)).length,
+    problems: {
+      ...stats,
+      total: getTotalProblemsValue(stats),
+    },
+  };
+}
+
+function buildProblemSnapshot(rows = state.rows, options = {}) {
+  const sourceRows = Array.isArray(rows) ? rows : [];
+  const snapshotScope = buildProblemSnapshotScope(sourceRows);
+  const stockPositiveRows = sourceRows.filter((row) => isStockPositiveProblemRow(row));
+  const stockPositiveScope = buildProblemSnapshotScope(stockPositiveRows);
   const cabinets = getProblemCabinetsWithEmpty(sourceRows);
   const cabinetItems = cabinets.map((cabinet) => {
     const cabinetRows = getRowsByCabinet(sourceRows, cabinet);
-    const cabinetStats = getProblemStats(cabinetRows);
+    const cabinetStockPositiveRows = cabinetRows.filter((row) => isStockPositiveProblemRow(row));
     return {
       cabinet,
-      totalRows: cabinetRows.length,
-      loadedRows: cabinetRows.filter((row) => row.data && !row.error).length,
-      errorRows: cabinetRows.filter((row) => Boolean(row.error)).length,
-      problems: {
-        ...cabinetStats,
-        total: getTotalProblemsValue(cabinetStats),
-      },
+      ...buildProblemSnapshotScope(cabinetRows),
+      stockPositive: buildProblemSnapshotScope(cabinetStockPositiveRows),
     };
   });
 
@@ -328,13 +342,8 @@ function buildProblemSnapshot(rows = state.rows, options = {}) {
     source,
     actionKey,
     mode,
-    totalRows: sourceRows.length,
-    loadedRows: sourceRows.filter((row) => row.data && !row.error).length,
-    errorRows: sourceRows.filter((row) => Boolean(row.error)).length,
-    problems: {
-      ...stats,
-      total: totalProblems,
-    },
+    ...snapshotScope,
+    stockPositive: stockPositiveScope,
     cabinets: cabinetItems,
   };
 }

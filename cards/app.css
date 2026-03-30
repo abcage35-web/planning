@@ -4865,6 +4865,11 @@ tbody tr:hover {
   max-width: 340px;
 }
 
+.problems-chart-stock-toggle {
+  margin-left: auto;
+  align-self: flex-end;
+}
+
 .problems-chart-content {
   display: grid;
   gap: var(--overlay-note-gap);
@@ -5736,6 +5741,11 @@ tbody tr:hover {
   .problems-chart-cabinet-field {
     min-width: 0;
     max-width: none;
+  }
+
+  .problems-chart-stock-toggle {
+    margin-left: 0;
+    align-self: flex-start;
   }
 
   .slides-wrap .slide-label {

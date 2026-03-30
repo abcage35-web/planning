@@ -2092,30 +2092,94 @@ function getProblemsChartSeriesConfig() {
   ];
 }
 
-function getSnapshotProblemsByZone(snapshot, cabinetRaw = "all") {
+function hasProblemSnapshotStockPositiveData(snapshot, cabinetRaw = "all") {
+  if (!snapshot || typeof snapshot !== "object") {
+    return false;
+  }
+
   const cabinet = String(cabinetRaw || "all").trim() || "all";
+  if (cabinet === "all") {
+    return Boolean(snapshot.stockPositive?.problems && typeof snapshot.stockPositive.problems === "object");
+  }
+
+  const items = Array.isArray(snapshot.cabinets) ? snapshot.cabinets : [];
+  const target = items.find((item) => String(item?.cabinet || "").trim() === cabinet);
+  return Boolean(target?.stockPositive?.problems && typeof target.stockPositive.problems === "object");
+}
+
+function ensureLatestProblemsChartSnapshotStockPositiveData() {
+  if (!Array.isArray(state.updateSnapshots) || state.updateSnapshots.length <= 0) {
+    return;
+  }
+  if (!Array.isArray(state.rows) || state.rows.length <= 0) {
+    return;
+  }
+
+  const lastIndex = state.updateSnapshots.length - 1;
+  const lastSnapshot = state.updateSnapshots[lastIndex];
+  if (hasProblemSnapshotStockPositiveData(lastSnapshot, "all")) {
+    return;
+  }
+
+  const rebuilt = buildProblemSnapshot(state.rows, {
+    source: lastSnapshot?.source,
+    actionKey: lastSnapshot?.actionKey,
+    mode: lastSnapshot?.mode,
+    at: lastSnapshot?.at,
+  });
+  rebuilt.id = String(lastSnapshot?.id || rebuilt.id);
+  state.updateSnapshots = normalizeProblemSnapshots([
+    ...state.updateSnapshots.slice(0, lastIndex),
+    rebuilt,
+  ]);
+  persistState();
+}
+
+function getSnapshotProblemsByZone(snapshot, cabinetRaw = "all", options = {}) {
+  const cabinet = String(cabinetRaw || "all").trim() || "all";
+  const stockPositiveOnly = options.stockPositiveOnly === true;
   const series = getProblemsChartSeriesConfig();
   const result = Object.fromEntries(series.map((item) => [item.key, 0]));
   if (!snapshot || typeof snapshot !== "object") {
-    return result;
+    return {
+      values: result,
+      hasStockPositiveData: !stockPositiveOnly,
+    };
   }
   let sourceProblems = snapshot?.problems;
+  let hasStockPositiveData = !stockPositiveOnly;
   if (cabinet === "all") {
-    sourceProblems = snapshot?.problems;
+    if (stockPositiveOnly && hasProblemSnapshotStockPositiveData(snapshot, cabinet)) {
+      sourceProblems = snapshot?.stockPositive?.problems;
+    } else {
+      sourceProblems = snapshot?.problems;
+      hasStockPositiveData = !stockPositiveOnly;
+    }
   } else {
     const items = Array.isArray(snapshot.cabinets) ? snapshot.cabinets : [];
     const target = items.find((item) => String(item?.cabinet || "").trim() === cabinet);
-    sourceProblems = target?.problems;
+    if (stockPositiveOnly && hasProblemSnapshotStockPositiveData(snapshot, cabinet)) {
+      sourceProblems = target?.stockPositive?.problems;
+    } else {
+      sourceProblems = target?.problems;
+      hasStockPositiveData = !stockPositiveOnly;
+    }
   }
 
   if (!sourceProblems || typeof sourceProblems !== "object") {
-    return result;
+    return {
+      values: result,
+      hasStockPositiveData,
+    };
   }
 
   for (const item of series) {
     result[item.key] = Math.max(0, Number(sourceProblems[item.key]) || 0);
   }
-  return result;
+  return {
+    values: result,
+    hasStockPositiveData,
+  };
 }
 
 function getSnapshotDayKey(atRaw) {
@@ -2275,7 +2339,9 @@ function openProblemsChart() {
   }
 
   ensureProblemSnapshotsInitialized();
+  ensureLatestProblemsChartSnapshotStockPositiveData();
   renderProblemsChartCabinetFilter();
+  renderProblemsChartStockFilterButton();
   renderProblemsChartContent();
   el.problemsChartModal.hidden = false;
 }
@@ -2299,6 +2365,23 @@ function handleProblemsChartCabinetFilterChange() {
   persistState();
 }
 
+function renderProblemsChartStockFilterButton() {
+  if (!el.problemsChartStockFilterBtn) {
+    return;
+  }
+
+  const isActive = state.chartStockPositiveOnly === true;
+  el.problemsChartStockFilterBtn.classList.toggle("is-active", isActive);
+  el.problemsChartStockFilterBtn.setAttribute("aria-pressed", isActive ? "true" : "false");
+}
+
+function handleProblemsChartStockFilterToggle() {
+  state.chartStockPositiveOnly = !(state.chartStockPositiveOnly === true);
+  renderProblemsChartStockFilterButton();
+  renderProblemsChartContent();
+  persistState();
+}
+
 function renderProblemsChartContent() {
   if (!el.problemsChartContent) {
     return;
@@ -2310,6 +2393,7 @@ function renderProblemsChartContent() {
     .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
   const snapshots = buildDailySnapshotsWithCarry(snapshotsByTime);
   const cabinet = normalizeProblemsChartCabinetFilter(state.chartCabinetFilter, snapshotsByTime);
+  const stockPositiveOnly = state.chartStockPositiveOnly === true;
   state.chartCabinetFilter = cabinet;
 
   if (snapshots.length <= 0) {
@@ -2321,7 +2405,10 @@ function renderProblemsChartContent() {
   const seriesConfig = getProblemsChartSeriesConfig();
   const points = snapshots.map((snapshot, index) => {
     const atDate = new Date(snapshot.at);
-    const values = getSnapshotProblemsByZone(snapshot, cabinet);
+    const snapshotProblems = getSnapshotProblemsByZone(snapshot, cabinet, {
+      stockPositiveOnly,
+    });
+    const values = snapshotProblems.values;
     const total = seriesConfig.reduce((sum, item) => sum + Number(values[item.key] || 0), 0);
     return {
       index,
@@ -2345,8 +2432,12 @@ function renderProblemsChartContent() {
       action: getActionLabel(snapshot.actionKey),
       mode: getModeLabel(snapshot.mode),
       isCarryForward: snapshot.isCarryForward === true,
+      hasStockPositiveData: snapshotProblems.hasStockPositiveData,
     };
   });
+  const stockFallbackCount = stockPositiveOnly
+    ? points.filter((point) => point.hasStockPositiveData === false).length
+    : 0;
 
   const width = 1040;
   const height = 340;
@@ -2398,6 +2489,7 @@ function renderProblemsChartContent() {
     }));
 
   const cabinetLabel = cabinet === "all" ? "Все кабинеты" : cabinet === "__empty__" ? "Без кабинета" : cabinet;
+  const productsLabel = stockPositiveOnly ? "С остатками" : "Все";
   const lastPoint = mapped[mapped.length - 1];
   const firstPoint = mapped[0];
   const delta = lastPoint ? lastPoint.total - (firstPoint?.total || 0) : 0;
@@ -2485,10 +2577,16 @@ function renderProblemsChartContent() {
       </span>`;
     })
     .join("");
+  const fallbackNoteHtml =
+    stockPositiveOnly && stockFallbackCount > 0
+      ? `<div class="overlay-note problems-chart-filter-note">Для ${stockFallbackCount} старых срезов данных по остаткам ещё не было, поэтому показан общий срез.</div>`
+      : "";
 
   el.problemsChartContent.innerHTML = `
+    ${fallbackNoteHtml}
     <div class="problems-chart-summary overlay-note">
       <span><strong>Кабинет:</strong> ${escapeHtml(cabinetLabel)}</span>
+      <span><strong>Товары:</strong> ${escapeHtml(productsLabel)}</span>
       <span><strong>Срезов (дней):</strong> ${mapped.length}</span>
       <span><strong>Последнее всего:</strong> ${lastPoint ? lastPoint.total : 0}</span>
       <span><strong>Дельта всего:</strong> ${escapeHtml(deltaText)}</span>

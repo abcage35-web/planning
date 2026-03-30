@@ -788,6 +788,7 @@ function buildStatePayload(savedAtRaw = null, overrides = {}) {
     colorVariantsCache: state.colorVariantsCache,
     updateSnapshots: normalizeProblemSnapshots(sourceUpdateSnapshots),
     chartCabinetFilter: state.chartCabinetFilter,
+    chartStockPositiveOnly: state.chartStockPositiveOnly,
   };
 }
 
@@ -969,6 +970,7 @@ function applyParsedState(parsed) {
     typeof normalizeProblemsChartCabinetFilter === "function"
       ? normalizeProblemsChartCabinetFilter(parsed.chartCabinetFilter, state.updateSnapshots)
       : normalizeDashboardCabinet(parsed.chartCabinetFilter, state.rows);
+  state.chartStockPositiveOnly = Boolean(parsed.chartStockPositiveOnly);
   state.rowsPage = 1;
 
   state.filters = {
@@ -1020,6 +1022,7 @@ function resetStateToDefaults() {
   state.colorVariantsCache = {};
   state.updateSnapshots = [];
   state.chartCabinetFilter = "all";
+  state.chartStockPositiveOnly = false;
   state.rowsPage = 1;
   state.filters = { ...FILTER_DEFAULTS };
 }
@@ -1147,6 +1150,34 @@ function normalizeProblemSnapshots(raw) {
   return normalized.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 }
 
+function normalizeProblemSnapshotStats(raw) {
+  const problemsRaw = raw && typeof raw === "object" ? raw : {};
+  return {
+    recommendationsNo: Number(problemsRaw.recommendationsNo) || 0,
+    richNo: Number(problemsRaw.richNo) || 0,
+    videoNo: Number(problemsRaw.videoNo) || 0,
+    autoplayNo: Number(problemsRaw.autoplayNo) || 0,
+    autoplayOver: Number(problemsRaw.autoplayOver) || 0,
+    tagsNo: Number(problemsRaw.tagsNo) || 0,
+    tagsOver: Number(problemsRaw.tagsOver) || 0,
+    coverDuplicate: Number(problemsRaw.coverDuplicate) || 0,
+    total: Number(problemsRaw.total) || 0,
+  };
+}
+
+function normalizeProblemSnapshotScope(raw) {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  return {
+    totalRows: Number(raw.totalRows) || 0,
+    loadedRows: Number(raw.loadedRows) || 0,
+    errorRows: Number(raw.errorRows) || 0,
+    problems: normalizeProblemSnapshotStats(raw.problems),
+  };
+}
+
 function normalizeProblemSnapshotEntry(raw) {
   if (!raw || typeof raw !== "object") {
     return null;
@@ -1159,19 +1190,8 @@ function normalizeProblemSnapshotEntry(raw) {
   const actionKey = String(raw.actionKey || "").trim() || "all";
   const modeRaw = String(raw.mode || "").trim();
   const mode = modeRaw || "full";
-
-  const problemsRaw = raw.problems && typeof raw.problems === "object" ? raw.problems : {};
-  const problems = {
-    recommendationsNo: Number(problemsRaw.recommendationsNo) || 0,
-    richNo: Number(problemsRaw.richNo) || 0,
-    videoNo: Number(problemsRaw.videoNo) || 0,
-    autoplayNo: Number(problemsRaw.autoplayNo) || 0,
-    autoplayOver: Number(problemsRaw.autoplayOver) || 0,
-    tagsNo: Number(problemsRaw.tagsNo) || 0,
-    tagsOver: Number(problemsRaw.tagsOver) || 0,
-    coverDuplicate: Number(problemsRaw.coverDuplicate) || 0,
-    total: Number(problemsRaw.total) || 0,
-  };
+  const problems = normalizeProblemSnapshotStats(raw.problems);
+  const stockPositive = normalizeProblemSnapshotScope(raw.stockPositive);
 
   const cabinetsRaw = Array.isArray(raw.cabinets) ? raw.cabinets : [];
   const cabinets = cabinetsRaw
@@ -1183,23 +1203,13 @@ function normalizeProblemSnapshotEntry(raw) {
       if (!cabinet) {
         return null;
       }
-      const itemProblemsRaw = item.problems && typeof item.problems === "object" ? item.problems : {};
       return {
         cabinet,
         totalRows: Number(item.totalRows) || 0,
         loadedRows: Number(item.loadedRows) || 0,
         errorRows: Number(item.errorRows) || 0,
-        problems: {
-          recommendationsNo: Number(itemProblemsRaw.recommendationsNo) || 0,
-          richNo: Number(itemProblemsRaw.richNo) || 0,
-          videoNo: Number(itemProblemsRaw.videoNo) || 0,
-          autoplayNo: Number(itemProblemsRaw.autoplayNo) || 0,
-          autoplayOver: Number(itemProblemsRaw.autoplayOver) || 0,
-          tagsNo: Number(itemProblemsRaw.tagsNo) || 0,
-          tagsOver: Number(itemProblemsRaw.tagsOver) || 0,
-          coverDuplicate: Number(itemProblemsRaw.coverDuplicate) || 0,
-          total: Number(itemProblemsRaw.total) || 0,
-        },
+        problems: normalizeProblemSnapshotStats(item.problems),
+        stockPositive: normalizeProblemSnapshotScope(item.stockPositive),
       };
     })
     .filter(Boolean);
@@ -1216,6 +1226,7 @@ function normalizeProblemSnapshotEntry(raw) {
     loadedRows: Number(raw.loadedRows) || 0,
     errorRows: Number(raw.errorRows) || 0,
     problems,
+    stockPositive,
     cabinets,
   };
 }

@@ -527,13 +527,24 @@
           </div>
         </div>
         <p class="subtle overlay-note">
-          График не зависит от глобальных фильтров таблицы. Фильтр ниже влияет только на этот график.
+          График не зависит от глобальных фильтров таблицы. Фильтры ниже влияют только на этот график.
         </p>
         <div class="problems-chart-controls">
           <label class="field problems-chart-cabinet-field">
             <span>Кабинет</span>
             <select id="problemsChartCabinetFilter" class="filter-select"></select>
           </label>
+          <button
+            id="problemsChartStockFilterBtn"
+            class="agreement-stock-toggle problems-chart-stock-toggle"
+            type="button"
+            data-hint="Показывать на графике только товары с остатками"
+            aria-label="Показывать на графике только товары с остатками"
+            aria-pressed="false"
+          >
+            <span class="agreement-stock-toggle-label">Товары с остатками</span>
+            <span class="agreement-stock-toggle-switch" aria-hidden="true"></span>
+          </button>
         </div>
         <div id="problemsChartContent" class="problems-chart-content"></div>
       </div>

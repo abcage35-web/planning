@@ -221,6 +221,7 @@ const state = {
   colorVariantsCache: {},
   updateSnapshots: [],
   chartCabinetFilter: "all",
+  chartStockPositiveOnly: false,
   filterCountMode: "problems",
   bulkCancelRequested: false,
   singleRowAbortController: null,
@@ -385,6 +386,7 @@ const el = {
   problemsChartModal: document.getElementById("problemsChartModal"),
   problemsChartCloseBtn: document.getElementById("problemsChartCloseBtn"),
   problemsChartCabinetFilter: document.getElementById("problemsChartCabinetFilter"),
+  problemsChartStockFilterBtn: document.getElementById("problemsChartStockFilterBtn"),
   problemsChartContent: document.getElementById("problemsChartContent"),
 };
 
@@ -1195,6 +1197,9 @@ function bindEvents() {
   }
   if (el.problemsChartCabinetFilter) {
     el.problemsChartCabinetFilter.addEventListener("change", handleProblemsChartCabinetFilterChange);
+  }
+  if (el.problemsChartStockFilterBtn) {
+    el.problemsChartStockFilterBtn.addEventListener("click", handleProblemsChartStockFilterToggle);
   }
   if (el.sellersContent) {
     el.sellersContent.addEventListener("click", handleSellerSettingsClick);
