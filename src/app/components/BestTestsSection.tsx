@@ -120,6 +120,21 @@ function shiftIsoDateTime(isoRaw: string, days: number) {
   return date.toISOString();
 }
 
+function formatAbTestActivityPeriod(test: TestCard) {
+  const startedAt = formatBlockDate(test.startedAtIso, test.startedAt);
+  const endedAt = formatBlockDate(test.endedAtIso, test.endedAt);
+  if (startedAt === "—" && endedAt === "—") {
+    return "—";
+  }
+  if (startedAt === endedAt || endedAt === "—") {
+    return startedAt;
+  }
+  if (startedAt === "—") {
+    return endedAt;
+  }
+  return `${startedAt} — ${endedAt}`;
+}
+
 function getVisibleComparisonRows(test: TestCard) {
   return BEST_RK_METRICS
     .map((label) => getComparisonRow(test, label))
@@ -335,6 +350,7 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
   const baselineVariant = getBaselineVariant(test);
   const bestVariant = getBestVariant(test) || baselineVariant;
   const rkCtrCr1Row = getComparisonRow(test, "CTR*CR1");
+  const abTestActivityPeriod = formatAbTestActivityPeriod(test);
   const beforeRkDate = formatBlockDate(shiftIsoDateTime(test.startedAtIso, -1), test.startedAt);
   const afterRkDate = formatBlockDate(shiftIsoDateTime(test.endedAtIso, 1), test.endedAt);
 
@@ -407,7 +423,7 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
                 {test.title || test.productName || `Тест ${test.testId}`}
               </h3>
               <p className="mt-0.5 text-[10px] text-slate-400" style={{ fontWeight: 600 }}>
-                Тест {test.testId} · {beforeRkDate} — {afterRkDate}
+                Тест {test.testId} · {abTestActivityPeriod}
               </p>
             </div>
 
