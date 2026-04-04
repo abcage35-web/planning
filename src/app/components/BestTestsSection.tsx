@@ -353,6 +353,7 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
   const abTestActivityPeriod = formatAbTestActivityPeriod(test);
   const beforeRkDate = formatBlockDate(shiftIsoDateTime(test.startedAtIso, -1), test.startedAt);
   const afterRkDate = formatBlockDate(shiftIsoDateTime(test.endedAtIso, 1), test.endedAt);
+  const title = test.title || test.productName || `Тест ${test.testId}`;
 
   const abRows: MetricRow[] = [
     {
@@ -408,23 +409,14 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
       <header className="border-b border-slate-800 bg-slate-900/85 px-2.5 py-2.5">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-xl bg-slate-100 px-2 text-[11px] text-slate-900" style={{ fontWeight: 900 }}>
-                  #{rank}
-                </span>
-                <div className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300" style={{ fontWeight: 800 }}>
-                  <Trophy className="h-3 w-3" />
-                  CTR*CR1: {rkCtrCr1Row?.after || "—"}
-                </div>
+            <div className="min-w-0 flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-xl bg-slate-100 px-2 text-[11px] text-slate-900" style={{ fontWeight: 900 }}>
+                #{rank}
+              </span>
+              <div className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300" style={{ fontWeight: 800 }}>
+                <Trophy className="h-3 w-3" />
+                CTR*CR1: {rkCtrCr1Row?.after || "—"}
               </div>
-
-              <h3 className="mt-1.5 line-clamp-2 text-[13px] text-white" style={{ fontWeight: 900, lineHeight: 1.15 }}>
-                {test.title || test.productName || `Тест ${test.testId}`}
-              </h3>
-              <p className="mt-0.5 text-[10px] text-slate-400" style={{ fontWeight: 600 }}>
-                Тест {test.testId} · {abTestActivityPeriod}
-              </p>
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center gap-1">
@@ -432,6 +424,18 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
               <LinkChip href={test.wbUrl} label="WB" />
             </div>
           </div>
+
+          <h3
+            className="w-full overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-white"
+            style={{ fontWeight: 900, lineHeight: 1.15 }}
+            title={title}
+          >
+            {title}
+          </h3>
+
+          <p className="text-[10px] text-slate-400" style={{ fontWeight: 600 }}>
+            Тест {test.testId} · {abTestActivityPeriod}
+          </p>
 
           <div className="flex flex-wrap gap-1.5">
             <MetaPill label="Артикул" value={test.article || "—"} />
