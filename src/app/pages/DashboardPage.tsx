@@ -267,6 +267,7 @@ export function DashboardPage() {
   const productSnapshotCacheRef = useRef(new Map<string, XwayProductSnapshot>());
   const productSnapshotInflightRef = useRef(new Set<string>());
   const xwayDialogRequestIdRef = useRef(0);
+  const filteredTestsRef = useRef<TestCard[]>([]);
 
   const applyXwayChecksToModel = useCallback((testId: string, checks: SummaryChecks | null, payload: XwayPayload | null = null) => {
     startTransition(() => {
@@ -581,6 +582,10 @@ export function DashboardPage() {
     [filteredTests],
   );
 
+  useEffect(() => {
+    filteredTestsRef.current = filteredTests;
+  }, [filteredTests]);
+
   const productMetaByTestId = useMemo(() => {
     const next: Record<string, ProductSnapshotMeta> = {};
     for (const test of filteredTests) {
@@ -595,12 +600,12 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (!model || !filteredXwaySignature) return;
-    void hydrateXwayForTests(filteredTests, { force: true, reset: true });
-  }, [filteredXwaySignature, filteredTests, hydrateXwayForTests, model]);
+    void hydrateXwayForTests(filteredTestsRef.current, { force: true, reset: true });
+  }, [filteredXwaySignature, hydrateXwayForTests, model]);
 
   const handleRefreshFilteredXway = useCallback(async () => {
-    await hydrateXwayForTests(filteredTests, { force: true, reset: true });
-  }, [filteredTests, hydrateXwayForTests]);
+    await hydrateXwayForTests(filteredTestsRef.current, { force: true, reset: true });
+  }, [hydrateXwayForTests]);
 
   const handleRefreshSingleXway = useCallback(async (test: TestCard) => {
     const meta = buildXwayRequestMeta(test);

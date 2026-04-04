@@ -194,6 +194,7 @@ export function XwayAbTestsPage() {
   const xwayInflightRef = useRef(new Map<string, Promise<XwayResolvedResult>>());
   const productSnapshotCacheRef = useRef(new Map<string, XwayProductSnapshot>());
   const productSnapshotInflightRef = useRef(new Set<string>());
+  const filteredTestsRef = useRef<XwayDashboardTest[]>([]);
 
   const applyPatchToModel = useCallback((testId: string, patch: Partial<XwayDashboardTest>) => {
     startTransition(() => {
@@ -481,13 +482,17 @@ export function XwayAbTestsPage() {
   );
 
   useEffect(() => {
+    filteredTestsRef.current = filteredTests;
+  }, [filteredTests]);
+
+  useEffect(() => {
     if (!model || !filteredXwaySignature) return;
-    void hydrateXwayForTests(filteredTests, { force: true, reset: true });
-  }, [filteredTests, filteredXwaySignature, hydrateXwayForTests, model]);
+    void hydrateXwayForTests(filteredTestsRef.current, { force: true, reset: true });
+  }, [filteredXwaySignature, hydrateXwayForTests, model]);
 
   const handleRefreshFilteredXway = useCallback(async () => {
-    await hydrateXwayForTests(filteredTests, { force: true, reset: true });
-  }, [filteredTests, hydrateXwayForTests]);
+    await hydrateXwayForTests(filteredTestsRef.current, { force: true, reset: true });
+  }, [hydrateXwayForTests]);
 
   const handleRefreshSingleXway = useCallback(async (testRaw: TestCard) => {
     const test = testRaw as XwayDashboardTest;
