@@ -323,21 +323,21 @@ function CompactMetricTable({
           {showHeader ? (
             <thead>
               <tr>
-                <th className={`whitespace-nowrap border-b border-r border-slate-200 bg-slate-100/80 text-left text-[9px] uppercase tracking-[0.12em] text-slate-500 dark:border-slate-800 dark:bg-slate-800/75 dark:text-slate-300 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
+                <th className={`whitespace-nowrap align-middle border-b border-r border-slate-200 bg-slate-100/80 text-left text-[9px] uppercase tracking-[0.12em] text-slate-500 dark:border-slate-800 dark:bg-slate-800/75 dark:text-slate-300 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
                   Метрика
                 </th>
-                <th className={`border-b border-r border-slate-200 bg-slate-50 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
+                <th className={`align-middle border-b border-r border-slate-200 bg-slate-50 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
                   До
                 </th>
                 {showDuring ? (
-                  <th className={`border-b border-r border-slate-200 bg-slate-50 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
+                  <th className={`align-middle border-b border-r border-slate-200 bg-slate-50 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
                     Во время
                   </th>
                 ) : null}
-                <th className={`border-b border-r border-slate-200 bg-slate-50 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
+                <th className={`align-middle border-b border-r border-slate-200 bg-slate-50 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
                   После
                 </th>
-                <th className={`border-b border-slate-200 bg-slate-50 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
+                <th className={`align-middle border-b border-slate-200 bg-slate-50 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
                   Прирост
                 </th>
               </tr>
@@ -347,7 +347,7 @@ function CompactMetricTable({
             {rows.map((row) => (
               <tr key={row.key} className={row.highlight ? "bg-emerald-50/60 dark:bg-emerald-500/8" : ""}>
                 <td
-                  className={`whitespace-nowrap border-b border-r border-slate-200 dark:border-slate-800 ${labelCellPaddingClass} ${
+                  className={`whitespace-nowrap align-middle border-b border-r border-slate-200 dark:border-slate-800 ${labelCellPaddingClass} ${
                     row.highlight
                       ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/18 dark:text-emerald-200"
                       : "bg-slate-50 text-slate-700 dark:bg-slate-800/55 dark:text-slate-200"
@@ -357,7 +357,7 @@ function CompactMetricTable({
                   {row.label}
                 </td>
                 <td
-                  className={`border-b border-r border-slate-200 text-center dark:border-slate-800 ${valueCellPaddingClass} ${
+                  className={`align-middle border-b border-r border-slate-200 text-center dark:border-slate-800 ${valueCellPaddingClass} ${
                     row.highlight ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/6 dark:text-emerald-100" : "text-slate-800 dark:text-slate-100"
                   }`}
                 >
@@ -365,7 +365,7 @@ function CompactMetricTable({
                 </td>
                 {showDuring ? (
                   <td
-                    className={`border-b border-r border-slate-200 text-center dark:border-slate-800 ${valueCellPaddingClass} ${
+                    className={`align-middle border-b border-r border-slate-200 text-center dark:border-slate-800 ${valueCellPaddingClass} ${
                       row.highlight ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/6 dark:text-emerald-100" : "text-slate-800 dark:text-slate-100"
                     }`}
                   >
@@ -373,14 +373,14 @@ function CompactMetricTable({
                   </td>
                 ) : null}
                 <td
-                  className={`border-b border-r border-slate-200 text-center dark:border-slate-800 ${valueCellPaddingClass} ${
+                  className={`align-middle border-b border-r border-slate-200 text-center dark:border-slate-800 ${valueCellPaddingClass} ${
                     row.highlight ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/6 dark:text-emerald-100" : "text-slate-800 dark:text-slate-100"
                   }`}
                 >
                   {row.after}
                 </td>
                 <td
-                  className={`border-b border-slate-200 text-center dark:border-slate-800 ${valueCellPaddingClass} ${
+                  className={`align-middle border-b border-slate-200 text-center dark:border-slate-800 ${valueCellPaddingClass} ${
                     row.highlight ? "bg-emerald-50 dark:bg-emerald-500/6" : ""
                   }`}
                 >
