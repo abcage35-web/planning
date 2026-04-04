@@ -231,6 +231,20 @@ function areSummaryChecksEqual(a: SummaryChecks | null | undefined, b: SummaryCh
   );
 }
 
+function buildCanonicalXwayTestUrl(payload: XwayPayload | null | undefined, fallbackTestIdRaw: string) {
+  const shopId = Number(payload?.product?.shopId);
+  const productId = Number(payload?.product?.productId);
+  const payloadTestId = Number(payload?.test?.id);
+  const fallbackTestId = Number(String(fallbackTestIdRaw || "").trim());
+  const testId = Number.isFinite(payloadTestId) && payloadTestId > 0 ? payloadTestId : fallbackTestId;
+
+  if (!Number.isFinite(shopId) || shopId <= 0 || !Number.isFinite(productId) || productId <= 0 || !Number.isFinite(testId) || testId <= 0) {
+    return "";
+  }
+
+  return `https://am.xway.ru/wb/shop/${shopId}/product/${productId}/ab-test/${testId}`;
+}
+
 export function DashboardPage() {
   const [model, setModel] = useState<DashboardModel | null>(null);
   const [loading, setLoading] = useState(false);
@@ -263,16 +277,19 @@ export function DashboardPage() {
           if (test.testId !== testId) return test;
           const nextActivityStartedAtIso = String(payload?.test?.startedAt || "").trim() || test.abActivityStartedAtIso || test.startedAtIso;
           const nextActivityEndedAtIso = String(payload?.test?.endedAt || "").trim() || test.abActivityEndedAtIso || test.endedAtIso;
+          const nextXwayUrl = buildCanonicalXwayTestUrl(payload, test.testId) || test.xwayUrl;
           const sameChecks = areSummaryChecksEqual(test.xwaySummaryChecks || null, checks);
           const sameActivityPeriod =
             String(test.abActivityStartedAtIso || test.startedAtIso || "") === String(nextActivityStartedAtIso || "")
             && String(test.abActivityEndedAtIso || test.endedAtIso || "") === String(nextActivityEndedAtIso || "");
-          if (sameChecks && sameActivityPeriod) {
+          const sameXwayUrl = String(test.xwayUrl || "").trim() === String(nextXwayUrl || "").trim();
+          if (sameChecks && sameActivityPeriod && sameXwayUrl) {
             return test;
           }
           changed = true;
           return {
             ...test,
+            xwayUrl: nextXwayUrl,
             xwaySummaryChecks: checks || null,
             abActivityStartedAtIso: nextActivityStartedAtIso,
             abActivityEndedAtIso: nextActivityEndedAtIso,
