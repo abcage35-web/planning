@@ -28,7 +28,7 @@ export function XwayFunnelDashboard({
   xwayStatusByTestId,
   onRefreshXway,
 }: Props) {
-  const [chartMode, setChartMode] = useState<ChartMode>("bars");
+  const [chartMode, setChartMode] = useState<ChartMode>("pies");
 
   if (!filteredTests.length) return null;
 
@@ -144,7 +144,7 @@ function DonutStage({
   label,
   count,
   total,
-  size = 64,
+  size = 54,
 }: {
   percent: number;
   colorFrom: string;
@@ -194,15 +194,15 @@ function DonutStage({
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[12px] text-slate-800 dark:text-slate-200" style={{ fontWeight: 700 }}>
+          <span className="text-[11px] text-slate-800 dark:text-slate-200" style={{ fontWeight: 700 }}>
             {percent}%
           </span>
         </div>
       </div>
-      <span className="text-[11px] text-slate-600 dark:text-slate-300 text-center" style={{ fontWeight: 700 }}>
+      <span className="text-[10px] text-slate-600 dark:text-slate-300 text-center leading-tight" style={{ fontWeight: 700 }}>
         {label}
       </span>
-      <span className="text-[9px] text-slate-400 dark:text-slate-500" style={{ fontWeight: 600, fontFamily: "JetBrains Mono, monospace" }}>
+      <span className="text-[8px] text-slate-400 dark:text-slate-500" style={{ fontWeight: 600, fontFamily: "JetBrains Mono, monospace" }}>
         {abFormatInt(count)} из {abFormatInt(total)}
       </span>
     </div>
@@ -226,14 +226,14 @@ function FunnelCardChart({
   const isAggregate = Boolean(card.isAggregate);
 
   return (
-    <div className={`border rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow ${
+    <div className={`border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow ${
       isAggregate
         ? "border-sky-200/80 dark:border-sky-700/60 bg-gradient-to-br from-sky-50/70 via-white to-slate-50/50 dark:from-sky-950/30 dark:via-slate-900 dark:to-slate-800/60"
         : "border-slate-200/80 dark:border-slate-700/80 bg-gradient-to-br from-white via-white to-slate-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/50"
     }`}>
-      <div className="flex items-start justify-between gap-2 mb-4">
+      <div className="flex items-start justify-between gap-2 mb-3">
         <div>
-          <h4 className="text-[16px] text-slate-800 dark:text-slate-100" style={{ fontWeight: 700 }}>
+          <h4 className="text-[15px] text-slate-800 dark:text-slate-100" style={{ fontWeight: 700 }}>
             {card.cabinet}
           </h4>
           <div className="text-[12px] text-amber-500/90 dark:text-amber-300/80 mt-0.5" style={{ fontWeight: 600 }}>
@@ -244,7 +244,7 @@ function FunnelCardChart({
           </div>
         </div>
         <span
-          className={`inline-flex items-center justify-center h-[32px] min-w-[56px] rounded-full border text-[14px] px-3 ${
+          className={`inline-flex items-center justify-center h-[30px] min-w-[52px] rounded-full border text-[13px] px-2.5 ${
             finalPercent >= 50
               ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
               : finalPercent >= 25
@@ -305,7 +305,7 @@ function FunnelCardChart({
           })}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 pt-1">
+        <div className="grid grid-cols-4 gap-1.5 pt-1">
           {card.stages.map((stage) => {
             const style = abGetFunnelStageStyle(stage.key);
             const percent = card.total > 0 ? Math.round((stage.count / card.total) * 100) : 0;
@@ -318,7 +318,7 @@ function FunnelCardChart({
               <button
                 key={stage.key}
                 onClick={() => onStageFilter(filterCabinet, stage.key, "xway")}
-                className={`rounded-lg p-2 border transition-all cursor-pointer ${
+                className={`rounded-lg px-1 py-1.5 border transition-all cursor-pointer ${
                   isActive
                     ? "border-sky-300/60 bg-sky-50/40 dark:bg-sky-900/20 dark:border-sky-700/60 shadow-sm"
                     : "border-transparent hover:bg-slate-50/80 dark:hover:bg-slate-800/80"
@@ -343,17 +343,17 @@ function FunnelCardChart({
 
 function PendingFunnelCard({ cabinet, mode }: { cabinet: string; mode: ChartMode }) {
   return (
-    <div className="border border-slate-200/80 dark:border-slate-700/80 rounded-xl bg-gradient-to-br from-white via-white to-slate-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/50 p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-2 mb-4">
+    <div className="border border-slate-200/80 dark:border-slate-700/80 rounded-xl bg-gradient-to-br from-white via-white to-slate-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/50 p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-2 mb-3">
         <div>
-          <h4 className="text-[16px] text-slate-800 dark:text-slate-100" style={{ fontWeight: 700 }}>
+          <h4 className="text-[15px] text-slate-800 dark:text-slate-100" style={{ fontWeight: 700 }}>
             {cabinet}
           </h4>
           <div className="text-[12px] text-slate-400 dark:text-slate-500 mt-0.5" style={{ fontWeight: 500 }}>
             Считаю XWAY…
           </div>
         </div>
-        <span className="inline-flex items-center justify-center h-[32px] min-w-[44px] rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-400 text-[14px] px-3" style={{ fontWeight: 700 }}>
+        <span className="inline-flex items-center justify-center h-[30px] min-w-[40px] rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-400 text-[13px] px-2.5" style={{ fontWeight: 700 }}>
           …
         </span>
       </div>
@@ -378,19 +378,19 @@ function PendingFunnelCard({ cabinet, mode }: { cabinet: string; mode: ChartMode
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 pt-1">
+        <div className="grid grid-cols-4 gap-1.5 pt-1">
           {["CTR", "Цена", "CTR x CR1", "Итог"].map((label) => (
             <div key={label} className="flex flex-col items-center gap-1">
-              <div className="relative" style={{ width: 64, height: 64 }}>
-                <svg width={64} height={64} viewBox="0 0 64 64" className="-rotate-90">
-                  <circle cx={32} cy={32} r={29} fill="none" stroke="currentColor" className="text-slate-100 dark:text-slate-700/60" strokeWidth={6} />
-                  <circle cx={32} cy={32} r={29} fill="none" stroke="#e2e8f0" strokeWidth={6} strokeLinecap="round" strokeDasharray={182} strokeDashoffset={140} className="animate-pulse" />
+              <div className="relative" style={{ width: 54, height: 54 }}>
+                <svg width={54} height={54} viewBox="0 0 54 54" className="-rotate-90">
+                  <circle cx={27} cy={27} r={24} fill="none" stroke="currentColor" className="text-slate-100 dark:text-slate-700/60" strokeWidth={6} />
+                  <circle cx={27} cy={27} r={24} fill="none" stroke="#e2e8f0" strokeWidth={6} strokeLinecap="round" strokeDasharray={151} strokeDashoffset={116} className="animate-pulse" />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-[12px] text-slate-400" style={{ fontWeight: 700 }}>—</span>
+                  <span className="text-[11px] text-slate-400" style={{ fontWeight: 700 }}>—</span>
                 </div>
               </div>
-              <span className="text-[11px] text-slate-400 dark:text-slate-500 text-center" style={{ fontWeight: 600 }}>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 text-center leading-tight" style={{ fontWeight: 600 }}>
                 {label}
               </span>
             </div>
