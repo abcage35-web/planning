@@ -7,6 +7,7 @@ export const AB_MATRIX_VARIANT_COL_WIDTH = 112;
 export const AB_XWAY_ERROR_CACHE_TTL_MS = 60_000;
 export const AB_XWAY_REQUEST_RETRIES = 2;
 export const AB_XWAY_REQUEST_RETRY_DELAY_MS = 500;
+export const AB_XWAY_REQUEST_TIMEOUT_MS = 45_000;
 
 const AB_DASHBOARD_SOURCE_SHEETS: Record<string, { gid: string; label: string }> = {
   catalog: { gid: "795894762", label: "Каталог товаров" },
@@ -1040,10 +1041,13 @@ export async function fetchXwayPayload(
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), AB_XWAY_REQUEST_TIMEOUT_MS);
     try {
       const response = await fetch(`/api/xway-ab-test?${params.toString()}`, {
         credentials: "same-origin",
         cache: "no-store",
+        signal: controller.signal,
         headers: {
           Accept: "application/json",
         },
@@ -1069,13 +1073,20 @@ export async function fetchXwayPayload(
 
       return payload;
     } catch (error) {
-      const normalizedError = error instanceof Error ? error : new Error("Не удалось получить данные XWAY.");
+      const normalizedError =
+        error instanceof DOMException && error.name === "AbortError"
+          ? new Error("Превышено время ожидания XWAY.")
+          : error instanceof Error
+            ? error
+            : new Error("Не удалось получить данные XWAY.");
       lastError = normalizedError;
-      if (attempt < retries && isRetryableXwayError(error)) {
+      if (attempt < retries && isRetryableXwayError(normalizedError)) {
         await wait(AB_XWAY_REQUEST_RETRY_DELAY_MS * (attempt + 1));
         continue;
       }
       throw normalizedError;
+    } finally {
+      window.clearTimeout(timeoutId);
     }
   }
 

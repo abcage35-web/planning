@@ -285,12 +285,18 @@ export function XwayAbTestsPage() {
     return task;
   }, []);
 
-  const hydrateXwayForTests = useCallback(async (testsRaw: XwayDashboardTest[], options: { force?: boolean } = {}) => {
+  const hydrateXwayForTests = useCallback(async (testsRaw: XwayDashboardTest[], options: { force?: boolean; reset?: boolean } = {}) => {
     const queue = testsRaw
       .map((test) => ({ test, meta: buildXwayRequestMeta(test) }))
       .filter((item) => item.meta.testId);
 
     if (!queue.length) return;
+
+    if (options.reset) {
+      for (const item of queue) {
+        xwayCacheRef.current.delete(buildXwayRequestKey(item.meta));
+      }
+    }
 
     setXwayStatusByTestId((current) => {
       const next = { ...current };
@@ -476,11 +482,11 @@ export function XwayAbTestsPage() {
 
   useEffect(() => {
     if (!model || !filteredXwaySignature) return;
-    void hydrateXwayForTests(filteredTests);
+    void hydrateXwayForTests(filteredTests, { force: true, reset: true });
   }, [filteredTests, filteredXwaySignature, hydrateXwayForTests, model]);
 
   const handleRefreshFilteredXway = useCallback(async () => {
-    await hydrateXwayForTests(filteredTests, { force: true });
+    await hydrateXwayForTests(filteredTests, { force: true, reset: true });
   }, [filteredTests, hydrateXwayForTests]);
 
   const handleRefreshSingleXway = useCallback(async (testRaw: TestCard) => {

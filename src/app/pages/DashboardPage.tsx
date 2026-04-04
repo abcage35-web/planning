@@ -570,8 +570,8 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (!model || !filteredXwaySignature) return;
-    void hydrateXwayForTests(filteredTests);
-  }, [filteredXwaySignature, hydrateXwayForTests, model]); // filteredTests is encoded in signature.
+    void hydrateXwayForTests(filteredTests, { force: true, reset: true });
+  }, [filteredXwaySignature, filteredTests, hydrateXwayForTests, model]);
 
   const handleRefreshFilteredXway = useCallback(async () => {
     await hydrateXwayForTests(filteredTests, { force: true, reset: true });
