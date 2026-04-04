@@ -23,6 +23,10 @@ interface MetricRow {
 type BestViewMode = "full" | "compact";
 
 const BEST_RK_METRICS = ["Цена", "Откл. цены", "Ставка", "Показы", "CTR", "CR1", "CTR*CR1"];
+const BEST_TABLE_METRIC_COL = "18%";
+const BEST_TABLE_VALUE_COL = "27%";
+const BEST_TABLE_GROWTH_COL = "28%";
+const BEST_TABLE_DURING_COL = "20.5%";
 
 function shouldShowCampaignType(typeRaw: string | null | undefined) {
   const value = String(typeRaw || "").trim();
@@ -286,21 +290,21 @@ function CompactMetricTable({
   return (
     <section className="overflow-hidden rounded-[16px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       <div className="overflow-hidden">
-        <table className="w-full border-collapse">
+        <table className="w-full table-fixed border-collapse">
           <colgroup>
-            <col style={{ width: "1%" }} />
+            <col style={{ width: BEST_TABLE_METRIC_COL }} />
             {showDuring ? (
               <>
-                <col style={{ width: "25%" }} />
-                <col style={{ width: "25%" }} />
-                <col style={{ width: "25%" }} />
-                <col style={{ width: "25%" }} />
+                <col style={{ width: BEST_TABLE_DURING_COL }} />
+                <col style={{ width: BEST_TABLE_DURING_COL }} />
+                <col style={{ width: BEST_TABLE_DURING_COL }} />
+                <col style={{ width: BEST_TABLE_DURING_COL }} />
               </>
             ) : (
               <>
-                <col style={{ width: "33%" }} />
-                <col style={{ width: "33%" }} />
-                <col style={{ width: "33%" }} />
+                <col style={{ width: BEST_TABLE_VALUE_COL }} />
+                <col style={{ width: BEST_TABLE_VALUE_COL }} />
+                <col style={{ width: BEST_TABLE_GROWTH_COL }} />
               </>
             )}
           </colgroup>
