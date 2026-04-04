@@ -621,7 +621,7 @@ export function BestTestsSection({
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 gap-2.5 ${viewMode === "compact" ? "lg:grid-cols-2 xl:grid-cols-3" : "lg:grid-cols-2 2xl:grid-cols-3"}`}>
+      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2 xl:grid-cols-3">
         {tests.map((test, index) => (
           <BestTestCard key={test.testId || `${test.article}-${index}`} test={test} rank={index + 1} mode={viewMode} />
         ))}
