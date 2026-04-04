@@ -253,22 +253,14 @@ function DateBadge({ label, value, accent = false }: { label: string; value: str
 }
 
 function CompactMetricTable({
-  title,
   rows,
   showDuring = false,
 }: {
-  title: string;
   rows: MetricRow[];
   showDuring?: boolean;
 }) {
   return (
     <section className="overflow-hidden rounded-[16px] border border-slate-800 bg-slate-900">
-      <div className="border-b border-slate-800 px-2.5 py-0.5">
-        <div className="text-[11px] uppercase tracking-[0.08em] text-white" style={{ fontWeight: 900 }}>
-          {title}
-        </div>
-      </div>
-
       <div className="overflow-hidden">
         <table className="w-full border-collapse">
           <colgroup>
@@ -471,8 +463,19 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
       </header>
 
       <div className="grid gap-1.5 p-2">
-        <CompactMetricTable title="AB-тест" rows={abRows} />
-        <CompactMetricTable title="РК" rows={rkRows} />
+        <section className="space-y-1">
+          <div className="px-1 text-[11px] uppercase tracking-[0.08em] text-slate-100" style={{ fontWeight: 900 }}>
+            AB-тест
+          </div>
+          <CompactMetricTable rows={abRows} />
+        </section>
+
+        <section className="space-y-1">
+          <div className="px-1 text-[11px] uppercase tracking-[0.08em] text-slate-100" style={{ fontWeight: 900 }}>
+            РК
+          </div>
+          <CompactMetricTable rows={rkRows} />
+        </section>
       </div>
     </article>
   );
