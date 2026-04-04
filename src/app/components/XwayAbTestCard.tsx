@@ -8,6 +8,12 @@ interface Props {
   test: XwayAbTest;
 }
 
+function shouldShowCampaignType(typeRaw: string | null | undefined) {
+  const value = String(typeRaw || "").trim();
+  if (!value) return false;
+  return !/^MAIN[\s_-]?IMAGE$/i.test(value);
+}
+
 function formatMoney(valueRaw: number) {
   const value = Number(valueRaw);
   if (!Number.isFinite(value)) return "—";
@@ -46,7 +52,7 @@ export function XwayAbTestCard({ test }: Props) {
                 Тест {test.testId}
               </h4>
               <Chip label="Артикул" value={test.article || "—"} mono />
-              <Chip label="Тип" value={test.type || "—"} />
+              {shouldShowCampaignType(test.type) ? <Chip label="Тип" value={test.type || "—"} /> : null}
               <Chip label="Кабинет" value={test.cabinet || "—"} />
             </div>
 

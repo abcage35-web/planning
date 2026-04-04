@@ -21,6 +21,12 @@ interface MetricRow {
 
 const BEST_RK_METRICS = ["Цена", "Откл. цены", "CTR", "CR1", "CTR*CR1"];
 
+function shouldShowCampaignType(typeRaw: string | null | undefined) {
+  const value = String(typeRaw || "").trim();
+  if (!value) return false;
+  return !/^MAIN[\s_-]?IMAGE$/i.test(value);
+}
+
 function parseDisplayNumber(valueRaw: string | number | null | undefined) {
   if (typeof valueRaw === "number") {
     return Number.isFinite(valueRaw) ? valueRaw : null;
@@ -158,10 +164,10 @@ function CoverPreview({
             rel="noopener noreferrer"
             className="block overflow-hidden rounded-[14px] border border-slate-700 bg-slate-900"
           >
-            <img src={imageUrl} alt={fallbackLabel} loading="lazy" decoding="async" className="block w-[70px] aspect-[3/4] object-cover" />
+            <img src={imageUrl} alt={fallbackLabel} loading="lazy" decoding="async" className="block w-[60px] aspect-[3/4] object-cover" />
           </a>
         ) : (
-          <div className="flex w-[70px] aspect-[3/4] items-center justify-center rounded-[14px] border border-dashed border-slate-700 bg-slate-900 px-2 text-center text-[9px] text-slate-500" style={{ fontWeight: 700 }}>
+          <div className="flex w-[60px] aspect-[3/4] items-center justify-center rounded-[14px] border border-dashed border-slate-700 bg-slate-900 px-2 text-center text-[9px] text-slate-500" style={{ fontWeight: 700 }}>
             Нет
           </div>
         )}
@@ -209,7 +215,7 @@ function DeltaBadge({ kind, text }: { kind?: string; text?: string }) {
         : "border-slate-600 bg-slate-800 text-slate-300";
 
   return (
-    <span className={`inline-flex h-6 items-center rounded-full border px-2 text-[10px] ${palette}`} style={{ fontWeight: 800 }}>
+    <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[9px] ${palette}`} style={{ fontWeight: 800 }}>
       {value}
     </span>
   );
@@ -239,32 +245,32 @@ function CompactMetricTable({
 }) {
   return (
     <section className="overflow-hidden rounded-[16px] border border-slate-800 bg-slate-900">
-      <div className="border-b border-slate-800 px-2.5 py-2">
-        <div className="text-[12px] text-white" style={{ fontWeight: 900 }}>
+      <div className="border-b border-slate-800 px-2.5 py-0.5">
+        <div className="text-[11px] uppercase tracking-[0.08em] text-white" style={{ fontWeight: 900 }}>
           {title}
         </div>
       </div>
 
       <div className="overflow-hidden">
-        <table className="w-full table-fixed border-collapse">
+        <table className="w-full border-collapse">
           <colgroup>
-            <col style={{ width: "28%" }} />
-            <col style={{ width: "24%" }} />
-            <col style={{ width: "24%" }} />
-            <col style={{ width: "24%" }} />
+            <col style={{ width: "1%" }} />
+            <col style={{ width: "33%" }} />
+            <col style={{ width: "33%" }} />
+            <col style={{ width: "33%" }} />
           </colgroup>
           <thead>
             <tr>
-              <th className="border-b border-r border-slate-800 bg-slate-800/75 px-2.5 py-1.5 text-left text-[9px] uppercase tracking-[0.12em] text-slate-300" style={{ fontWeight: 800 }}>
+              <th className="whitespace-nowrap border-b border-r border-slate-800 bg-slate-800/75 px-2 py-1 text-left text-[9px] uppercase tracking-[0.12em] text-slate-300" style={{ fontWeight: 800 }}>
                 Метрика
               </th>
-              <th className="border-b border-r border-slate-800 bg-slate-950/70 px-2 py-1.5 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
+              <th className="border-b border-r border-slate-800 bg-slate-950/70 px-2 py-1 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
                 До
               </th>
-              <th className="border-b border-r border-slate-800 bg-slate-950/70 px-2 py-1.5 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
+              <th className="border-b border-r border-slate-800 bg-slate-950/70 px-2 py-1 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
                 После
               </th>
-              <th className="border-b border-slate-800 bg-slate-950/70 px-2 py-1.5 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
+              <th className="border-b border-slate-800 bg-slate-950/70 px-2 py-1 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
                 Прирост
               </th>
             </tr>
@@ -272,16 +278,16 @@ function CompactMetricTable({
           <tbody>
             {rows.map((row) => (
               <tr key={row.key} className={row.highlight ? "bg-slate-950/60" : ""}>
-                <td className={`border-b border-r border-slate-800 px-2.5 py-1.5 text-[10px] ${row.highlight ? "bg-slate-800/85 text-white" : "bg-slate-800/55 text-slate-200"}`} style={{ fontWeight: 800 }}>
+                <td className={`whitespace-nowrap border-b border-r border-slate-800 px-2 py-1 text-[10px] ${row.highlight ? "bg-slate-800/85 text-white" : "bg-slate-800/55 text-slate-200"}`} style={{ fontWeight: 800 }}>
                   {row.label}
                 </td>
-                <td className="border-b border-r border-slate-800 px-1.5 py-1.5 text-center text-slate-100">
+                <td className="border-b border-r border-slate-800 px-1.5 py-1 text-center text-slate-100">
                   {row.before}
                 </td>
-                <td className="border-b border-r border-slate-800 px-1.5 py-1.5 text-center text-slate-100">
+                <td className="border-b border-r border-slate-800 px-1.5 py-1 text-center text-slate-100">
                   {row.after}
                 </td>
-                <td className="border-b border-slate-800 px-1.5 py-1.5 text-center">
+                <td className="border-b border-slate-800 px-1.5 py-1 text-center">
                   {row.growthNode || <DeltaBadge kind={row.growthKind} text={row.growthText} />}
                 </td>
               </tr>
@@ -295,7 +301,7 @@ function CompactMetricTable({
 
 function buildValueNode(value: string) {
   return (
-    <span className="font-mono text-[11px] text-slate-100" style={{ fontWeight: 800 }}>
+    <span className="font-mono text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
       {value || "—"}
     </span>
   );
@@ -314,7 +320,7 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
       label: "Обложка",
       before: <CoverPreview variant={baselineVariant} fallbackLabel={`Тест ${test.testId} до`} />,
       after: <CoverPreview variant={bestVariant} fallbackLabel={`Тест ${test.testId} после`} badge="Лучшая" />,
-      growthNode: <span className="text-[11px] text-slate-500">—</span>,
+      growthNode: <span className="text-[10px] text-slate-500">—</span>,
     },
     {
       key: "views",
@@ -368,7 +374,7 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
                 </span>
                 <div className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300" style={{ fontWeight: 800 }}>
                   <Trophy className="h-3 w-3" />
-                  CTR*CR1 {rkCtrCr1Row?.after || "—"}
+                  CTR*CR1: {rkCtrCr1Row?.after || "—"}
                 </div>
               </div>
 
@@ -388,7 +394,7 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
 
           <div className="flex flex-wrap gap-1.5">
             <MetaPill label="Артикул" value={test.article || "—"} />
-            <MetaPill label="Тип" value={test.type || "—"} />
+            {shouldShowCampaignType(test.type) ? <MetaPill label="Тип" value={test.type || "—"} /> : null}
             <MetaPill label="Кабинет" value={test.cabinet || "—"} />
             <DateBadge label="До" value={beforeRkDate} />
             <DateBadge label="После" value={afterRkDate} accent />

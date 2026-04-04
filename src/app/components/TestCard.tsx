@@ -17,6 +17,12 @@ interface Props {
   showXwayMetricsButton?: boolean;
 }
 
+function shouldShowCampaignType(typeRaw: string | null | undefined) {
+  const value = String(typeRaw || "").trim();
+  if (!value) return false;
+  return !/^MAIN[\s_-]?IMAGE$/i.test(value);
+}
+
 export function TestCardComponent({
   test,
   xwayStatus,
@@ -57,7 +63,7 @@ export function TestCardComponent({
               </h4>
               <div className="flex flex-wrap gap-1">
                 <Chip label="Артикул" value={test.article || "—"} />
-                <Chip label="Тип РК" value={test.type || "—"} />
+                {shouldShowCampaignType(test.type) ? <Chip label="Тип РК" value={test.type || "—"} /> : null}
                 <Chip label="Кабинет" value={test.cabinet || "—"} />
               </div>
             </div>
