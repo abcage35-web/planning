@@ -85,22 +85,24 @@ export function XwayFunnelDashboard({
           <div className="inline-flex items-center p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80">
             <button
               onClick={() => setGroupByIp(false)}
-              className={`h-8 px-3 rounded-md inline-flex items-center justify-center cursor-pointer transition-all ${
+              className={`h-7 px-2.5 rounded-md inline-flex items-center justify-center cursor-pointer text-[12px] transition-all ${
                 !groupByIp
                   ? "bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 shadow-sm"
                   : "border border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               }`}
+              style={{ fontWeight: 600 }}
               title="Показывать по кабинетам"
             >
               По кабинетам
             </button>
             <button
               onClick={() => setGroupByIp(true)}
-              className={`h-8 px-3 rounded-md inline-flex items-center justify-center cursor-pointer transition-all ${
+              className={`h-7 px-2.5 rounded-md inline-flex items-center justify-center cursor-pointer text-[12px] transition-all ${
                 groupByIp
                   ? "bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 shadow-sm"
                   : "border border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               }`}
+              style={{ fontWeight: 600 }}
               title="Группировать по ИП"
             >
               По ИП
@@ -110,25 +112,25 @@ export function XwayFunnelDashboard({
           <div className="inline-flex items-center p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80">
             <button
               onClick={() => setChartMode("bars")}
-              className={`w-8 h-8 rounded-md inline-flex items-center justify-center cursor-pointer transition-all ${
+              className={`w-7 h-7 rounded-md inline-flex items-center justify-center cursor-pointer transition-all ${
                 chartMode === "bars"
                   ? "bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 shadow-sm"
                   : "border border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               }`}
               title="Полосы"
             >
-              <BarChart2 className="w-4 h-4" />
+              <BarChart2 className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setChartMode("pies")}
-              className={`w-8 h-8 rounded-md inline-flex items-center justify-center cursor-pointer transition-all ${
+              className={`w-7 h-7 rounded-md inline-flex items-center justify-center cursor-pointer transition-all ${
                 chartMode === "pies"
                   ? "bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 shadow-sm"
                   : "border border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               }`}
               title="Круговые диаграммы"
             >
-              <PieChartIcon className="w-4 h-4" />
+              <PieChartIcon className="w-3.5 h-3.5" />
             </button>
           </div>
 
