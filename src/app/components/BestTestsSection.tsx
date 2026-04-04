@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ExternalLink, Trophy } from "lucide-react";
 
 import { abBuildXwayAbTestUrl, abBuildXwayRkUrl, abFormatCompactPeriodDateTime, abNormalizeStatus, type ComparisonRow, type TestCard, type Variant } from "./ab-service";
@@ -19,6 +19,8 @@ interface MetricRow {
   growthNode?: ReactNode;
   highlight?: boolean;
 }
+
+type BestViewMode = "full" | "compact";
 
 const BEST_RK_METRICS = ["Цена", "Откл. цены", "Ставка", "Показы", "CTR", "CR1", "CTR*CR1"];
 
@@ -269,10 +271,18 @@ function DateBadge({ label, value, accent = false }: { label: string; value: str
 function CompactMetricTable({
   rows,
   showDuring = false,
+  showHeader = true,
+  dense = false,
 }: {
   rows: MetricRow[];
   showDuring?: boolean;
+  showHeader?: boolean;
+  dense?: boolean;
 }) {
+  const headerCellPaddingClass = dense ? "px-1.5 py-0.5" : "px-2 py-1";
+  const labelCellPaddingClass = dense ? "px-2 py-0.5 text-[9px]" : "px-2 py-1 text-[10px]";
+  const valueCellPaddingClass = dense ? "px-1.5 py-0.5" : "px-1.5 py-1";
+
   return (
     <section className="overflow-hidden rounded-[16px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       <div className="overflow-hidden">
@@ -294,32 +304,34 @@ function CompactMetricTable({
               </>
             )}
           </colgroup>
-          <thead>
-            <tr>
-              <th className="whitespace-nowrap border-b border-r border-slate-200 bg-slate-100/80 px-2 py-1 text-left text-[9px] uppercase tracking-[0.12em] text-slate-500 dark:border-slate-800 dark:bg-slate-800/75 dark:text-slate-300" style={{ fontWeight: 800 }}>
-                Метрика
-              </th>
-              <th className="border-b border-r border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100" style={{ fontWeight: 800 }}>
-                До
-              </th>
-              {showDuring ? (
-                <th className="border-b border-r border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100" style={{ fontWeight: 800 }}>
-                  Во время
+          {showHeader ? (
+            <thead>
+              <tr>
+                <th className={`whitespace-nowrap border-b border-r border-slate-200 bg-slate-100/80 text-left text-[9px] uppercase tracking-[0.12em] text-slate-500 dark:border-slate-800 dark:bg-slate-800/75 dark:text-slate-300 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
+                  Метрика
                 </th>
-              ) : null}
-              <th className="border-b border-r border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100" style={{ fontWeight: 800 }}>
-                После
-              </th>
-              <th className="border-b border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100" style={{ fontWeight: 800 }}>
-                Прирост
-              </th>
-            </tr>
-          </thead>
+                <th className={`border-b border-r border-slate-200 bg-slate-50 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
+                  До
+                </th>
+                {showDuring ? (
+                  <th className={`border-b border-r border-slate-200 bg-slate-50 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
+                    Во время
+                  </th>
+                ) : null}
+                <th className={`border-b border-r border-slate-200 bg-slate-50 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
+                  После
+                </th>
+                <th className={`border-b border-slate-200 bg-slate-50 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100 ${headerCellPaddingClass}`} style={{ fontWeight: 800 }}>
+                  Прирост
+                </th>
+              </tr>
+            </thead>
+          ) : null}
           <tbody>
             {rows.map((row) => (
               <tr key={row.key} className={row.highlight ? "bg-emerald-50/60 dark:bg-emerald-500/8" : ""}>
                 <td
-                  className={`whitespace-nowrap border-b border-r border-slate-200 px-2 py-1 text-[10px] dark:border-slate-800 ${
+                  className={`whitespace-nowrap border-b border-r border-slate-200 dark:border-slate-800 ${labelCellPaddingClass} ${
                     row.highlight
                       ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/18 dark:text-emerald-200"
                       : "bg-slate-50 text-slate-700 dark:bg-slate-800/55 dark:text-slate-200"
@@ -329,7 +341,7 @@ function CompactMetricTable({
                   {row.label}
                 </td>
                 <td
-                  className={`border-b border-r border-slate-200 px-1.5 py-1 text-center dark:border-slate-800 ${
+                  className={`border-b border-r border-slate-200 text-center dark:border-slate-800 ${valueCellPaddingClass} ${
                     row.highlight ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/6 dark:text-emerald-100" : "text-slate-800 dark:text-slate-100"
                   }`}
                 >
@@ -337,7 +349,7 @@ function CompactMetricTable({
                 </td>
                 {showDuring ? (
                   <td
-                    className={`border-b border-r border-slate-200 px-1.5 py-1 text-center dark:border-slate-800 ${
+                    className={`border-b border-r border-slate-200 text-center dark:border-slate-800 ${valueCellPaddingClass} ${
                       row.highlight ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/6 dark:text-emerald-100" : "text-slate-800 dark:text-slate-100"
                     }`}
                   >
@@ -345,14 +357,14 @@ function CompactMetricTable({
                   </td>
                 ) : null}
                 <td
-                  className={`border-b border-r border-slate-200 px-1.5 py-1 text-center dark:border-slate-800 ${
+                  className={`border-b border-r border-slate-200 text-center dark:border-slate-800 ${valueCellPaddingClass} ${
                     row.highlight ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/6 dark:text-emerald-100" : "text-slate-800 dark:text-slate-100"
                   }`}
                 >
                   {row.after}
                 </td>
                 <td
-                  className={`border-b border-slate-200 px-1.5 py-1 text-center dark:border-slate-800 ${
+                  className={`border-b border-slate-200 text-center dark:border-slate-800 ${valueCellPaddingClass} ${
                     row.highlight ? "bg-emerald-50 dark:bg-emerald-500/6" : ""
                   }`}
                 >
@@ -375,7 +387,23 @@ function buildValueNode(value: string) {
   );
 }
 
-function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
+function buildComparisonMetricRow(test: TestCard, label: string, options: { highlight?: boolean } = {}): MetricRow {
+  const row = getComparisonRow(test, label);
+  const growth = row ? getRkGrowth(row) : { text: "—", kind: "unknown" };
+
+  return {
+    key: label,
+    label,
+    before: buildValueNode(row?.before || "—"),
+    after: buildValueNode(row?.after || "—"),
+    growthText: growth.text,
+    growthKind: growth.kind,
+    highlight: Boolean(options.highlight),
+  };
+}
+
+function BestTestCard({ test, rank, mode }: { test: TestCard; rank: number; mode: BestViewMode }) {
+  const isCompact = mode === "compact";
   const baselineVariant = getBaselineVariant(test);
   const bestVariant = getBestVariant(test) || baselineVariant;
   const rkCtrCr1GrowthText = getCtrCr1GrowthText(test);
@@ -435,9 +463,21 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
     };
   });
 
+  const compactAbRows: MetricRow[] = [abRows[0], abRows[3]].filter(Boolean);
+  const compactRkMainRows: MetricRow[] = [
+    buildComparisonMetricRow(test, "CTR"),
+    buildComparisonMetricRow(test, "CR1"),
+    buildComparisonMetricRow(test, "CTR*CR1", { highlight: true }),
+  ];
+  const compactRkSupportRows: MetricRow[] = [
+    buildComparisonMetricRow(test, "Цена"),
+    buildComparisonMetricRow(test, "Ставка"),
+    buildComparisonMetricRow(test, "Показы"),
+  ];
+
   return (
     <article className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:shadow-[0_18px_48px_-28px_rgba(15,23,42,0.7)]">
-      <header className="border-b border-slate-200 bg-slate-50/85 px-2.5 py-2.5 dark:border-slate-800 dark:bg-slate-900/85">
+      <header className={`border-b border-slate-200 bg-slate-50/85 dark:border-slate-800 dark:bg-slate-900/85 ${isCompact ? "px-2.5 py-2" : "px-2.5 py-2.5"}`}>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex flex-wrap items-center gap-1.5">
@@ -465,34 +505,44 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
             {title}
           </h3>
 
-          <p className="text-[10px] text-slate-500 dark:text-slate-400" style={{ fontWeight: 600 }}>
+          <p className={`text-slate-500 dark:text-slate-400 ${isCompact ? "text-[11px]" : "text-[10px]"}`} style={{ fontWeight: 600 }}>
             Тест {test.testId} · {abTestActivityPeriod}
           </p>
 
           <div className="flex flex-wrap gap-1.5">
             <MetaPill label="Артикул" value={test.article || "—"} />
-            {shouldShowCampaignType(test.type) ? <MetaPill label="Тип" value={test.type || "—"} /> : null}
+            {!isCompact && shouldShowCampaignType(test.type) ? <MetaPill label="Тип" value={test.type || "—"} /> : null}
             <MetaPill label="Кабинет" value={test.cabinet || "—"} />
-            <DateBadge label="До" value={beforeRkDate} />
-            <DateBadge label="После" value={afterRkDate} accent />
+            {!isCompact ? <DateBadge label="До" value={beforeRkDate} /> : null}
+            {!isCompact ? <DateBadge label="После" value={afterRkDate} accent /> : null}
           </div>
         </div>
       </header>
 
-      <div className="grid gap-1.5 p-2">
-        <section className="space-y-1">
-          <div className="px-1 text-[11px] uppercase tracking-[0.08em] text-slate-700 dark:text-slate-100" style={{ fontWeight: 900 }}>
-            AB-тест
-          </div>
-          <CompactMetricTable rows={abRows} />
-        </section>
+      <div className={`grid ${isCompact ? "gap-1 p-1.5" : "gap-1.5 p-2"}`}>
+        {isCompact ? (
+          <>
+            <CompactMetricTable rows={compactAbRows} dense />
+            <CompactMetricTable rows={compactRkMainRows} showHeader={false} dense />
+            <CompactMetricTable rows={compactRkSupportRows} showHeader={false} dense />
+          </>
+        ) : (
+          <>
+            <section className="space-y-1">
+              <div className="px-1 text-[11px] uppercase tracking-[0.08em] text-slate-700 dark:text-slate-100" style={{ fontWeight: 900 }}>
+                AB-тест
+              </div>
+              <CompactMetricTable rows={abRows} />
+            </section>
 
-        <section className="space-y-1">
-          <div className="px-1 text-[11px] uppercase tracking-[0.08em] text-slate-700 dark:text-slate-100" style={{ fontWeight: 900 }}>
-            РК
-          </div>
-          <CompactMetricTable rows={rkRows} />
-        </section>
+            <section className="space-y-1">
+              <div className="px-1 text-[11px] uppercase tracking-[0.08em] text-slate-700 dark:text-slate-100" style={{ fontWeight: 900 }}>
+                РК
+              </div>
+              <CompactMetricTable rows={rkRows} />
+            </section>
+          </>
+        )}
       </div>
     </article>
   );
@@ -514,6 +564,8 @@ export function BestTestsSection({
   tests,
   emptyMessage = "Нет завершённых успешных чистых тестов с рассчитанным приростом CTR*CR1 под выбранные фильтры.",
 }: Props) {
+  const [viewMode, setViewMode] = useState<BestViewMode>("full");
+
   if (!tests.length) {
     return (
       <div className="rounded-2xl border border-slate-200/80 bg-white px-6 py-8 text-center text-[14px] text-slate-500 shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:text-slate-400" style={{ fontWeight: 600 }}>
@@ -534,15 +586,44 @@ export function BestTestsSection({
               Только успешные по воронке чистых тестов, сортировка по `приросту CTR*CR1` по убыванию.
             </p>
           </div>
-          <div className="inline-flex h-9 items-center rounded-2xl border border-slate-200/80 bg-slate-50 px-3 text-[12px] text-slate-700 dark:border-slate-700/80 dark:bg-slate-800 dark:text-slate-200" style={{ fontWeight: 800 }}>
-            Найдено: {tests.length}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-2xl border border-slate-200/80 bg-slate-50 p-0.5 dark:border-slate-700/80 dark:bg-slate-800">
+              <button
+                type="button"
+                onClick={() => setViewMode("full")}
+                className={`inline-flex h-8 items-center rounded-[14px] px-3 text-[12px] transition-colors ${
+                  viewMode === "full"
+                    ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+                }`}
+                style={{ fontWeight: 800 }}
+              >
+                Полный
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("compact")}
+                className={`inline-flex h-8 items-center rounded-[14px] px-3 text-[12px] transition-colors ${
+                  viewMode === "compact"
+                    ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100"
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+                }`}
+                style={{ fontWeight: 800 }}
+              >
+                Сжатый
+              </button>
+            </div>
+
+            <div className="inline-flex h-9 items-center rounded-2xl border border-slate-200/80 bg-slate-50 px-3 text-[12px] text-slate-700 dark:border-slate-700/80 dark:bg-slate-800 dark:text-slate-200" style={{ fontWeight: 800 }}>
+              Найдено: {tests.length}
+            </div>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2 2xl:grid-cols-3">
         {tests.map((test, index) => (
-          <BestTestCard key={test.testId || `${test.article}-${index}`} test={test} rank={index + 1} />
+          <BestTestCard key={test.testId || `${test.article}-${index}`} test={test} rank={index + 1} mode={viewMode} />
         ))}
       </div>
     </section>
