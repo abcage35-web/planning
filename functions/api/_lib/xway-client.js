@@ -234,17 +234,39 @@ export function xwayAggregateCampaignStats(campaignsRaw) {
     orders: 0,
     sumPrice: 0,
     matchedCount: 0,
+    bid: null,
   };
+  let weightedBidSum = 0;
+  let weightedBidViews = 0;
+  let bidSum = 0;
+  let bidCount = 0;
 
   for (const campaign of campaigns) {
     const stat = campaign?.stat || {};
+    const views = Number(stat.views) || 0;
+    const bid = Number(campaign?.bid ?? campaign?.cpm ?? stat?.bid ?? stat?.cpm);
     totals.views += Number(stat.views) || 0;
     totals.clicks += Number(stat.clicks) || 0;
     totals.atbs += Number(stat.atbs) || 0;
     totals.orders += Number(stat.orders) || 0;
     totals.sumPrice += Number(stat.sumPrice) || 0;
     totals.matchedCount += 1;
+
+    if (Number.isFinite(bid) && bid > 0) {
+      bidSum += bid;
+      bidCount += 1;
+      if (views > 0) {
+        weightedBidSum += bid * views;
+        weightedBidViews += views;
+      }
+    }
   }
+
+  totals.bid = weightedBidViews > 0
+    ? weightedBidSum / weightedBidViews
+    : bidCount > 0
+      ? bidSum / bidCount
+      : null;
 
   return totals;
 }

@@ -12,6 +12,7 @@ interface MetricRow {
   key: string;
   label: string;
   before: ReactNode;
+  during?: ReactNode;
   after: ReactNode;
   growthText?: string;
   growthKind?: string;
@@ -19,7 +20,7 @@ interface MetricRow {
   highlight?: boolean;
 }
 
-const BEST_RK_METRICS = ["Цена", "Откл. цены", "CTR", "CR1", "CTR*CR1"];
+const BEST_RK_METRICS = ["Цена", "Откл. цены", "Ставка", "Показы", "CTR", "CR1", "CTR*CR1"];
 
 function shouldShowCampaignType(typeRaw: string | null | undefined) {
   const value = String(typeRaw || "").trim();
@@ -239,9 +240,11 @@ function DateBadge({ label, value, accent = false }: { label: string; value: str
 function CompactMetricTable({
   title,
   rows,
+  showDuring = false,
 }: {
   title: string;
   rows: MetricRow[];
+  showDuring?: boolean;
 }) {
   return (
     <section className="overflow-hidden rounded-[16px] border border-slate-800 bg-slate-900">
@@ -255,9 +258,20 @@ function CompactMetricTable({
         <table className="w-full border-collapse">
           <colgroup>
             <col style={{ width: "1%" }} />
-            <col style={{ width: "33%" }} />
-            <col style={{ width: "33%" }} />
-            <col style={{ width: "33%" }} />
+            {showDuring ? (
+              <>
+                <col style={{ width: "25%" }} />
+                <col style={{ width: "25%" }} />
+                <col style={{ width: "25%" }} />
+                <col style={{ width: "25%" }} />
+              </>
+            ) : (
+              <>
+                <col style={{ width: "33%" }} />
+                <col style={{ width: "33%" }} />
+                <col style={{ width: "33%" }} />
+              </>
+            )}
           </colgroup>
           <thead>
             <tr>
@@ -267,6 +281,11 @@ function CompactMetricTable({
               <th className="border-b border-r border-slate-800 bg-slate-950/70 px-2 py-1 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
                 До
               </th>
+              {showDuring ? (
+                <th className="border-b border-r border-slate-800 bg-slate-950/70 px-2 py-1 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
+                  Во время
+                </th>
+              ) : null}
               <th className="border-b border-r border-slate-800 bg-slate-950/70 px-2 py-1 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
                 После
               </th>
@@ -284,6 +303,11 @@ function CompactMetricTable({
                 <td className="border-b border-r border-slate-800 px-1.5 py-1 text-center text-slate-100">
                   {row.before}
                 </td>
+                {showDuring ? (
+                  <td className="border-b border-r border-slate-800 px-1.5 py-1 text-center text-slate-100">
+                    {row.during || <span className="text-[10px] text-slate-500">—</span>}
+                  </td>
+                ) : null}
                 <td className="border-b border-r border-slate-800 px-1.5 py-1 text-center text-slate-100">
                   {row.after}
                 </td>
@@ -355,12 +379,14 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
       key: row.label,
       label: row.label,
       before: buildValueNode(row.before || "—"),
+      during: buildValueNode(row.during || "—"),
       after: buildValueNode(row.after || "—"),
       growthText: growth.text,
       growthKind: growth.kind,
       highlight: String(row.label || "").trim() === "CTR*CR1",
     };
   });
+  const showRkDuring = rkRows.some((row) => row.key === "Показы" || row.key === "Ставка");
 
   return (
     <article className="overflow-hidden rounded-[22px] border border-slate-800 bg-slate-950 shadow-[0_18px_48px_-28px_rgba(15,23,42,0.7)]">
@@ -404,7 +430,7 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
 
       <div className="grid gap-1.5 p-2">
         <CompactMetricTable title="AB-тест" rows={abRows} />
-        <CompactMetricTable title="РК" rows={rkRows} />
+        <CompactMetricTable title="РК" rows={rkRows} showDuring={showRkDuring} />
       </div>
     </article>
   );

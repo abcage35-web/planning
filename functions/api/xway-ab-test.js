@@ -48,6 +48,21 @@ function normalizeCampaignRecord(campaign) {
       ? rawSumPrice.replace(/[^\d,.-]/g, "").replace(",", ".")
       : rawSumPrice,
   );
+  const rawBid =
+    campaign?.bid
+    ?? campaign?.cpm
+    ?? campaign?.CPM
+    ?? campaign?.bet
+    ?? campaign?.rate
+    ?? campaign?.bid_price
+    ?? campaign?.stat?.bid
+    ?? campaign?.stat?.cpm
+    ?? campaign?.stat?.CPM;
+  const normalizedBid = Number(
+    typeof rawBid === "string"
+      ? rawBid.replace(/[^\d,.-]/g, "").replace(",", ".")
+      : rawBid,
+  );
 
   return {
     id: Number(campaign?.id) || 0,
@@ -55,6 +70,7 @@ function normalizeCampaignRecord(campaign) {
     name: String(campaign?.name || "").trim(),
     query: String(campaign?.query || "").trim(),
     typeId: String(campaign?.type || "").trim(),
+    bid: Number.isFinite(normalizedBid) ? normalizedBid : null,
     stat: {
       views: Number(campaign?.stat?.views) || 0,
       clicks: Number(campaign?.stat?.clicks) || 0,
@@ -75,6 +91,8 @@ function matchCampaignRecord(campaign, campaignTypeRaw, campaignExternalIdRaw) {
 
 function buildMetricsRows(beforeMetrics, duringMetrics, afterMetrics) {
   const rows = [
+    { key: "views", label: "Показы", percent: false },
+    { key: "bid", label: "Ставка", percent: false },
     { key: "ctr", label: "CTR", percent: true },
     { key: "cr1", label: "CR1", percent: true },
     { key: "cr2", label: "CR2", percent: true },
@@ -293,9 +311,23 @@ export async function onRequestGet(context) {
     const beforeTotals = xwayAggregateCampaignStats(beforeCampaigns);
     const duringTotals = xwayAggregateCampaignStats(duringCampaigns);
     const afterTotals = hasAfterWindow ? xwayAggregateCampaignStats(afterCampaigns) : null;
-    const beforeMetrics = xwayBuildConversionMetrics(beforeTotals);
-    const duringMetrics = xwayBuildConversionMetrics(duringTotals);
-    const afterMetrics = hasAfterWindow && afterTotals ? xwayBuildConversionMetrics(afterTotals) : null;
+    const beforeMetrics = {
+      ...xwayBuildConversionMetrics(beforeTotals),
+      views: Number(beforeTotals?.views) || 0,
+      bid: Number.isFinite(Number(beforeTotals?.bid)) ? Number(beforeTotals.bid) : null,
+    };
+    const duringMetrics = {
+      ...xwayBuildConversionMetrics(duringTotals),
+      views: Number(duringTotals?.views) || 0,
+      bid: Number.isFinite(Number(duringTotals?.bid)) ? Number(duringTotals.bid) : null,
+    };
+    const afterMetrics = hasAfterWindow && afterTotals
+      ? {
+          ...xwayBuildConversionMetrics(afterTotals),
+          views: Number(afterTotals?.views) || 0,
+          bid: Number.isFinite(Number(afterTotals?.bid)) ? Number(afterTotals.bid) : null,
+        }
+      : null;
 
     return json({
       ok: true,

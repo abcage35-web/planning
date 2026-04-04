@@ -108,6 +108,9 @@ function TotalsCard({ title, totals }: { title: string; totals: XwayTotals | und
           Показы: <strong>{new Intl.NumberFormat("ru-RU").format(Number(totals?.views) || 0)}</strong>
         </div>
         <div>
+          Ставка: <strong>{Number.isFinite(Number(totals?.bid)) ? new Intl.NumberFormat("ru-RU").format(Number(totals?.bid)) : "—"}</strong>
+        </div>
+        <div>
           Клики: <strong>{new Intl.NumberFormat("ru-RU").format(Number(totals?.clicks) || 0)}</strong>
         </div>
         <div>
@@ -140,10 +143,10 @@ function MetricsTable({
 
   return (
     <div className="overflow-auto rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
-      <table className="w-full min-w-[440px] border-collapse">
+      <table className="w-full min-w-[560px] border-collapse">
         <thead>
           <tr>
-            {["Метрика", "До", "После", "Прирост"].map((head) => (
+            {["Метрика", "До", "Во время", "После", "Прирост"].map((head) => (
               <th
                 key={head}
                 className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-left text-[10px] uppercase tracking-[0.12em] text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
@@ -160,6 +163,9 @@ function MetricsTable({
             const beforeText = isExportRow
               ? String((row as TestCard["comparisonRows"][number]).before || "—")
               : formatXwayMetricValue((row as XwayMetricRow).before, (row as XwayMetricRow).kind);
+            const duringText = isExportRow
+              ? String((row as TestCard["comparisonRows"][number]).during || "—")
+              : formatXwayMetricValue((row as XwayMetricRow).during, (row as XwayMetricRow).kind);
             const afterText = isExportRow
               ? String((row as TestCard["comparisonRows"][number]).after || "—")
               : formatXwayMetricValue((row as XwayMetricRow).after, (row as XwayMetricRow).kind);
@@ -176,6 +182,9 @@ function MetricsTable({
                 </td>
                 <td className="border-b border-slate-100 px-3 py-2 font-mono text-[12px] text-slate-600 dark:border-slate-700 dark:text-slate-300">
                   {beforeText}
+                </td>
+                <td className="border-b border-slate-100 px-3 py-2 font-mono text-[12px] text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                  {duringText}
                 </td>
                 <td className="border-b border-slate-100 px-3 py-2 font-mono text-[12px] text-slate-600 dark:border-slate-700 dark:text-slate-300">
                   {afterText}
@@ -252,6 +261,8 @@ export function XwayDetailsDialog({
   const campaignType = String(payload?.campaignType || test.type || "").trim() || "—";
   const campaignExternalId = String(payload?.campaignExternalId || test.campaignExternalId || "").trim();
   const beforeDate = formatIsoDate(payload?.range?.before);
+  const duringFromDate = formatIsoDate(payload?.range?.during?.from);
+  const duringToDate = formatIsoDate(payload?.range?.during?.to);
   const afterDate = formatIsoDate(payload?.range?.after);
   const xwayRows = Array.isArray(payload?.metrics) ? payload.metrics : [];
   const campaignsBefore = Array.isArray(payload?.matchedCampaigns?.before) ? payload?.matchedCampaigns?.before : [];
@@ -276,7 +287,7 @@ export function XwayDetailsDialog({
               <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-400" style={{ fontWeight: 500 }}>
                 Тип РК: {campaignType}
                 {campaignExternalId ? ` · ID РК: ${campaignExternalId}` : ""}
-                {payload ? ` · До: ${beforeDate} · После: ${afterDate}` : ""}
+                {payload ? ` · До: ${beforeDate} · Во время: ${duringFromDate} — ${duringToDate} · После: ${afterDate}` : ""}
               </p>
             </div>
             <button
@@ -342,8 +353,9 @@ export function XwayDetailsDialog({
 
             {status === "ready" && payload ? (
               <div className="space-y-5">
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 xl:grid-cols-3">
                   <TotalsCard title="До" totals={payload.totals?.before} />
+                  <TotalsCard title="Во время" totals={payload.totals?.during} />
                   <TotalsCard title="После" totals={payload.totals?.after} />
                 </div>
 

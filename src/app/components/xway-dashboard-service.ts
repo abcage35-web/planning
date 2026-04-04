@@ -178,6 +178,8 @@ function buildSheetPriceRows(snapshot: XwaySheetPriceSnapshot | null | undefined
 function buildDefaultComparisonRows(sheetPrice: XwaySheetPriceSnapshot | null | undefined) {
   return [
     ...buildSheetPriceRows(sheetPrice),
+    buildEmptyComparisonRow("Ставка"),
+    buildEmptyComparisonRow("Показы"),
     buildEmptyComparisonRow("CTR"),
     buildEmptyComparisonRow("CR1"),
     buildEmptyComparisonRow("CR2"),
@@ -630,6 +632,10 @@ function buildTimelineMetricRow(
   return { label, before, during, after, deltaText, deltaKind };
 }
 
+function formatBidValue(valueRaw: number | null) {
+  return Number.isFinite(Number(valueRaw)) ? abFormatInt(valueRaw) : "—";
+}
+
 function buildVariantCards(test: XwayDashboardTest, payload: XwayPayload) {
   const rawVariants = Array.isArray(payload.variantStats) ? payload.variantStats : [];
   if (!rawVariants.length) {
@@ -783,6 +789,8 @@ function buildComparisonRows(payload: XwayPayload, sheetPrice: XwaySheetPriceSna
 
   return [
     ...buildSheetPriceRows(sheetPrice),
+    buildTimelineMetricRow("Ставка", metricRow("bid")?.before ?? null, metricRow("bid")?.during ?? null, metricRow("bid")?.after ?? null, formatBidValue),
+    buildTimelineMetricRow("Показы", metricRow("views")?.before ?? null, metricRow("views")?.during ?? null, metricRow("views")?.after ?? null, (value) => abFormatInt(value)),
     buildTimelineMetricRow("CTR", metricRow("ctr")?.before ?? null, metricRow("ctr")?.during ?? null, metricRow("ctr")?.after ?? null, (value) => formatFractionToPercent(value, 2)),
     buildTimelineMetricRow("CR1", metricRow("cr1")?.before ?? null, metricRow("cr1")?.during ?? null, metricRow("cr1")?.after ?? null, (value) => formatFractionToPercent(value, 2)),
     buildTimelineMetricRow("CR2", metricRow("cr2")?.before ?? null, metricRow("cr2")?.during ?? null, metricRow("cr2")?.after ?? null, (value) => formatFractionToPercent(value, 2)),

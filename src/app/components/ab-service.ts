@@ -907,6 +907,7 @@ export interface XwayTotals {
   atbs?: number;
   orders?: number;
   sumPrice?: number;
+  bid?: number | null;
 }
 
 export interface XwayPayload {
