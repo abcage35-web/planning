@@ -173,7 +173,7 @@ function DonutStage({
   label,
   count,
   total,
-  size = 54,
+  size = 62,
 }: {
   percent: number;
   colorFrom: string;
@@ -223,7 +223,7 @@ function DonutStage({
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[11px] text-slate-800 dark:text-slate-200" style={{ fontWeight: 700 }}>
+          <span className="text-[12px] text-slate-800 dark:text-slate-200" style={{ fontWeight: 700 }}>
             {percent}%
           </span>
         </div>
@@ -231,8 +231,8 @@ function DonutStage({
       <span className="text-[10px] text-slate-600 dark:text-slate-300 text-center leading-tight" style={{ fontWeight: 700 }}>
         {label}
       </span>
-      <span className="text-[8px] text-slate-400 dark:text-slate-500" style={{ fontWeight: 600, fontFamily: "JetBrains Mono, monospace" }}>
-        {abFormatInt(count)} из {abFormatInt(total)}
+      <span className="text-[10px] text-slate-400 dark:text-slate-500" style={{ fontWeight: 700, fontFamily: "JetBrains Mono, monospace" }}>
+        {abFormatInt(count)} / {abFormatInt(total)}
       </span>
     </div>
   );
