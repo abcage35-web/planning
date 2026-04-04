@@ -178,10 +178,12 @@ function CoverPreview({
   variant,
   fallbackLabel,
   badge,
+  sizePx = 60,
 }: {
   variant: Variant | null;
   fallbackLabel: string;
   badge?: string;
+  sizePx?: number;
 }) {
   const imageUrl = String(variant?.imageUrl || "").trim();
 
@@ -200,10 +202,20 @@ function CoverPreview({
             rel="noopener noreferrer"
             className="block overflow-hidden rounded-[14px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
           >
-            <img src={imageUrl} alt={fallbackLabel} loading="lazy" decoding="async" className="block w-[60px] aspect-[3/4] object-cover" />
+            <img
+              src={imageUrl}
+              alt={fallbackLabel}
+              loading="lazy"
+              decoding="async"
+              className="block aspect-[3/4] object-cover"
+              style={{ width: `${sizePx}px` }}
+            />
           </a>
         ) : (
-          <div className="flex w-[60px] aspect-[3/4] items-center justify-center rounded-[14px] border border-dashed border-slate-300 bg-slate-50 px-2 text-center text-[9px] text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500" style={{ fontWeight: 700 }}>
+          <div
+            className="flex aspect-[3/4] items-center justify-center rounded-[14px] border border-dashed border-slate-300 bg-slate-50 px-2 text-center text-[9px] text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500"
+            style={{ fontWeight: 700, width: `${sizePx}px` }}
+          >
             Нет
           </div>
         )}
@@ -411,6 +423,7 @@ function buildComparisonMetricRow(test: TestCard, label: string, options: { high
 
 function BestTestCard({ test, rank, mode }: { test: TestCard; rank: number; mode: BestViewMode }) {
   const isCompact = mode === "compact";
+  const coverSizePx = isCompact ? 80 : 92;
   const baselineVariant = getBaselineVariant(test);
   const bestVariant = getBestVariant(test) || baselineVariant;
   const rkCtrCr1GrowthText = getCtrCr1GrowthText(test);
@@ -425,8 +438,8 @@ function BestTestCard({ test, rank, mode }: { test: TestCard; rank: number; mode
     {
       key: "cover",
       label: "Обложка",
-      before: <CoverPreview variant={baselineVariant} fallbackLabel={`Тест ${test.testId} до`} />,
-      after: <CoverPreview variant={bestVariant} fallbackLabel={`Тест ${test.testId} после`} />,
+      before: <CoverPreview variant={baselineVariant} fallbackLabel={`Тест ${test.testId} до`} sizePx={coverSizePx} />,
+      after: <CoverPreview variant={bestVariant} fallbackLabel={`Тест ${test.testId} после`} sizePx={coverSizePx} />,
       growthNode: <span className="text-[10px] text-slate-500">—</span>,
     },
     {
