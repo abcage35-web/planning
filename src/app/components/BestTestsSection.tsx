@@ -192,12 +192,12 @@ function CoverPreview({
             href={imageUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="block overflow-hidden rounded-[14px] border border-slate-700 bg-slate-900"
+            className="block overflow-hidden rounded-[14px] border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
           >
             <img src={imageUrl} alt={fallbackLabel} loading="lazy" decoding="async" className="block w-[60px] aspect-[3/4] object-cover" />
           </a>
         ) : (
-          <div className="flex w-[60px] aspect-[3/4] items-center justify-center rounded-[14px] border border-dashed border-slate-700 bg-slate-900 px-2 text-center text-[9px] text-slate-500" style={{ fontWeight: 700 }}>
+          <div className="flex w-[60px] aspect-[3/4] items-center justify-center rounded-[14px] border border-dashed border-slate-300 bg-slate-50 px-2 text-center text-[9px] text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-500" style={{ fontWeight: 700 }}>
             Нет
           </div>
         )}
@@ -208,8 +208,8 @@ function CoverPreview({
 
 function MetaPill({ label, value }: { label: string; value: string }) {
   return (
-    <span className="inline-flex h-6 items-center rounded-full border border-slate-700/80 bg-slate-900/80 px-2 text-[10px] text-slate-300" style={{ fontWeight: 700 }}>
-      {label}: <span className="ml-1 text-slate-100">{value || "—"}</span>
+    <span className="inline-flex h-6 items-center rounded-full border border-slate-200 bg-white px-2 text-[10px] text-slate-500 dark:border-slate-700/80 dark:bg-slate-900/80 dark:text-slate-300" style={{ fontWeight: 700 }}>
+      {label}: <span className="ml-1 text-slate-900 dark:text-slate-100">{value || "—"}</span>
     </span>
   );
 }
@@ -222,7 +222,7 @@ function LinkChip({ href, label }: { href: string; label: string }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex h-7 items-center gap-1 rounded-xl border border-slate-700/80 bg-slate-900/80 px-2 text-[10px] text-slate-200 transition-colors hover:border-teal-500/60 hover:bg-teal-950/30"
+      className="inline-flex h-7 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 text-[10px] text-slate-700 transition-colors hover:border-teal-300 hover:bg-teal-50 dark:border-slate-700/80 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-teal-500/60 dark:hover:bg-teal-950/30"
       style={{ fontWeight: 700 }}
     >
       <ExternalLink className="h-3 w-3" />
@@ -239,10 +239,10 @@ function DeltaBadge({ kind, text }: { kind?: string; text?: string }) {
 
   const palette =
     kind === "good"
-      ? "border-emerald-500/40 bg-emerald-500/12 text-emerald-300"
+      ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/12 dark:text-emerald-300"
       : kind === "bad"
-        ? "border-rose-500/40 bg-rose-500/12 text-rose-300"
-        : "border-slate-600 bg-slate-800 text-slate-300";
+        ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/12 dark:text-rose-300"
+        : "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300";
 
   return (
     <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[9px] ${palette}`} style={{ fontWeight: 800 }}>
@@ -256,8 +256,8 @@ function DateBadge({ label, value, accent = false }: { label: string; value: str
     <span
       className={`inline-flex h-6 items-center rounded-full border px-2 text-[9px] ${
         accent
-          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-          : "border-slate-700 bg-slate-950/80 text-slate-300"
+          ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-300"
+          : "border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-300"
       }`}
       style={{ fontWeight: 800 }}
     >
@@ -274,7 +274,7 @@ function CompactMetricTable({
   showDuring?: boolean;
 }) {
   return (
-    <section className="overflow-hidden rounded-[16px] border border-slate-800 bg-slate-900">
+    <section className="overflow-hidden rounded-[16px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       <div className="overflow-hidden">
         <table className="w-full border-collapse">
           <colgroup>
@@ -296,64 +296,64 @@ function CompactMetricTable({
           </colgroup>
           <thead>
             <tr>
-              <th className="whitespace-nowrap border-b border-r border-slate-800 bg-slate-800/75 px-2 py-1 text-left text-[9px] uppercase tracking-[0.12em] text-slate-300" style={{ fontWeight: 800 }}>
+              <th className="whitespace-nowrap border-b border-r border-slate-200 bg-slate-100/80 px-2 py-1 text-left text-[9px] uppercase tracking-[0.12em] text-slate-500 dark:border-slate-800 dark:bg-slate-800/75 dark:text-slate-300" style={{ fontWeight: 800 }}>
                 Метрика
               </th>
-              <th className="border-b border-r border-slate-800 bg-slate-950/70 px-2 py-1 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
+              <th className="border-b border-r border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100" style={{ fontWeight: 800 }}>
                 До
               </th>
               {showDuring ? (
-                <th className="border-b border-r border-slate-800 bg-slate-950/70 px-2 py-1 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
+                <th className="border-b border-r border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100" style={{ fontWeight: 800 }}>
                   Во время
                 </th>
               ) : null}
-              <th className="border-b border-r border-slate-800 bg-slate-950/70 px-2 py-1 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
+              <th className="border-b border-r border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100" style={{ fontWeight: 800 }}>
                 После
               </th>
-              <th className="border-b border-slate-800 bg-slate-950/70 px-2 py-1 text-center text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
+              <th className="border-b border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] text-slate-800 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-100" style={{ fontWeight: 800 }}>
                 Прирост
               </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.key} className={row.highlight ? "bg-emerald-500/8" : ""}>
+              <tr key={row.key} className={row.highlight ? "bg-emerald-50/60 dark:bg-emerald-500/8" : ""}>
                 <td
-                  className={`whitespace-nowrap border-b border-r border-slate-800 px-2 py-1 text-[10px] ${
+                  className={`whitespace-nowrap border-b border-r border-slate-200 px-2 py-1 text-[10px] ${
                     row.highlight
-                      ? "bg-emerald-500/18 text-emerald-200"
-                      : "bg-slate-800/55 text-slate-200"
+                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/18 dark:text-emerald-200"
+                      : "bg-slate-50 text-slate-700 dark:bg-slate-800/55 dark:text-slate-200"
                   }`}
                   style={{ fontWeight: 800 }}
                 >
                   {row.label}
                 </td>
                 <td
-                  className={`border-b border-r border-slate-800 px-1.5 py-1 text-center ${
-                    row.highlight ? "bg-emerald-500/6 text-emerald-100" : "text-slate-100"
+                  className={`border-b border-r border-slate-200 px-1.5 py-1 text-center ${
+                    row.highlight ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/6 dark:text-emerald-100" : "text-slate-800 dark:border-slate-800 dark:text-slate-100"
                   }`}
                 >
                   {row.before}
                 </td>
                 {showDuring ? (
                   <td
-                    className={`border-b border-r border-slate-800 px-1.5 py-1 text-center ${
-                      row.highlight ? "bg-emerald-500/6 text-emerald-100" : "text-slate-100"
+                    className={`border-b border-r border-slate-200 px-1.5 py-1 text-center ${
+                      row.highlight ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/6 dark:text-emerald-100" : "text-slate-800 dark:border-slate-800 dark:text-slate-100"
                     }`}
                   >
-                    {row.during || <span className="text-[10px] text-slate-500">—</span>}
+                    {row.during || <span className="text-[10px] text-slate-400 dark:text-slate-500">—</span>}
                   </td>
                 ) : null}
                 <td
-                  className={`border-b border-r border-slate-800 px-1.5 py-1 text-center ${
-                    row.highlight ? "bg-emerald-500/6 text-emerald-100" : "text-slate-100"
+                  className={`border-b border-r border-slate-200 px-1.5 py-1 text-center ${
+                    row.highlight ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/6 dark:text-emerald-100" : "text-slate-800 dark:border-slate-800 dark:text-slate-100"
                   }`}
                 >
                   {row.after}
                 </td>
                 <td
-                  className={`border-b border-slate-800 px-1.5 py-1 text-center ${
-                    row.highlight ? "bg-emerald-500/6" : ""
+                  className={`border-b border-slate-200 px-1.5 py-1 text-center dark:border-slate-800 ${
+                    row.highlight ? "bg-emerald-50 dark:bg-emerald-500/6" : ""
                   }`}
                 >
                   {row.growthNode || <DeltaBadge kind={row.growthKind} text={row.growthText} />}
@@ -369,7 +369,7 @@ function CompactMetricTable({
 
 function buildValueNode(value: string) {
   return (
-    <span className="font-mono text-[10px] text-slate-100" style={{ fontWeight: 800 }}>
+    <span className="font-mono text-[10px] text-slate-800 dark:text-slate-100" style={{ fontWeight: 800 }}>
       {value || "—"}
     </span>
   );
@@ -436,15 +436,15 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
   });
 
   return (
-    <article className="overflow-hidden rounded-[22px] border border-slate-800 bg-slate-950 shadow-[0_18px_48px_-28px_rgba(15,23,42,0.7)]">
-      <header className="border-b border-slate-800 bg-slate-900/85 px-2.5 py-2.5">
+    <article className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:shadow-[0_18px_48px_-28px_rgba(15,23,42,0.7)]">
+      <header className="border-b border-slate-200 bg-slate-50/85 px-2.5 py-2.5 dark:border-slate-800 dark:bg-slate-900/85">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex flex-wrap items-center gap-1.5">
               <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-xl bg-slate-100 px-2 text-[11px] text-slate-900" style={{ fontWeight: 900 }}>
                 #{rank}
               </span>
-              <div className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-300" style={{ fontWeight: 800 }}>
+              <div className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-300" style={{ fontWeight: 800 }}>
                 <Trophy className="h-3 w-3" />
                 Прирост CTR*CR1: {rkCtrCr1GrowthText}
               </div>
@@ -458,14 +458,14 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
           </div>
 
           <h3
-            className="w-full overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-white"
+            className="w-full overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-slate-900 dark:text-white"
             style={{ fontWeight: 900, lineHeight: 1.15 }}
             title={title}
           >
             {title}
           </h3>
 
-          <p className="text-[10px] text-slate-400" style={{ fontWeight: 600 }}>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400" style={{ fontWeight: 600 }}>
             Тест {test.testId} · {abTestActivityPeriod}
           </p>
 
@@ -481,14 +481,14 @@ function BestTestCard({ test, rank }: { test: TestCard; rank: number }) {
 
       <div className="grid gap-1.5 p-2">
         <section className="space-y-1">
-          <div className="px-1 text-[11px] uppercase tracking-[0.08em] text-slate-100" style={{ fontWeight: 900 }}>
+          <div className="px-1 text-[11px] uppercase tracking-[0.08em] text-slate-700 dark:text-slate-100" style={{ fontWeight: 900 }}>
             AB-тест
           </div>
           <CompactMetricTable rows={abRows} />
         </section>
 
         <section className="space-y-1">
-          <div className="px-1 text-[11px] uppercase tracking-[0.08em] text-slate-100" style={{ fontWeight: 900 }}>
+          <div className="px-1 text-[11px] uppercase tracking-[0.08em] text-slate-700 dark:text-slate-100" style={{ fontWeight: 900 }}>
             РК
           </div>
           <CompactMetricTable rows={rkRows} />
