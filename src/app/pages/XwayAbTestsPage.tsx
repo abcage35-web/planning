@@ -194,7 +194,6 @@ export function XwayAbTestsPage() {
   const xwayInflightRef = useRef(new Map<string, Promise<XwayResolvedResult>>());
   const productSnapshotCacheRef = useRef(new Map<string, XwayProductSnapshot>());
   const productSnapshotInflightRef = useRef(new Set<string>());
-  const didAutoHydrateRef = useRef(false);
 
   const applyPatchToModel = useCallback((testId: string, patch: Partial<XwayDashboardTest>) => {
     startTransition(() => {
@@ -333,7 +332,6 @@ export function XwayAbTestsPage() {
     xwayInflightRef.current.clear();
     productSnapshotCacheRef.current.clear();
     productSnapshotInflightRef.current.clear();
-    didAutoHydrateRef.current = false;
     setProductSnapshotsByKey({});
     try {
       const data = await loadXwayDashboardData();
@@ -467,12 +465,19 @@ export function XwayAbTestsPage() {
   }, []);
 
   const filteredTests = model ? (abFilterTests(model, filters) as XwayDashboardTest[]) : [];
+  const filteredXwaySignature = useMemo(
+    () =>
+      filteredTests
+        .map((test) => buildXwayRequestKey(buildXwayRequestMeta(test)))
+        .sort()
+        .join("||"),
+    [filteredTests],
+  );
 
   useEffect(() => {
-    if (!model || didAutoHydrateRef.current) return;
-    didAutoHydrateRef.current = true;
-    void hydrateXwayForTests(abFilterTests(model, filters) as XwayDashboardTest[]);
-  }, [filters, hydrateXwayForTests, model]);
+    if (!model || !filteredXwaySignature) return;
+    void hydrateXwayForTests(filteredTests);
+  }, [filteredTests, filteredXwaySignature, hydrateXwayForTests, model]);
 
   const handleRefreshFilteredXway = useCallback(async () => {
     await hydrateXwayForTests(filteredTests, { force: true });
