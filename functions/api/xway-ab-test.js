@@ -41,6 +41,231 @@ function buildProductPageReferer(shopIdRaw, productIdRaw) {
   return `https://am.xway.ru/wb/shop/${shopId}/product/${productId}`;
 }
 
+function parseBidHistoryDateTime(valueRaw) {
+  const value = String(valueRaw || "").trim();
+  if (!value) {
+    return null;
+  }
+
+  const match = value.match(/^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (!match) {
+    return null;
+  }
+
+  const [, dayRaw, monthRaw, yearRaw, hoursRaw = "00", minutesRaw = "00", secondsRaw = "00"] = match;
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  const hours = Number(hoursRaw);
+  const minutes = Number(minutesRaw);
+  const seconds = Number(secondsRaw);
+  if (
+    !Number.isFinite(year)
+    || !Number.isFinite(month)
+    || !Number.isFinite(day)
+    || !Number.isFinite(hours)
+    || !Number.isFinite(minutes)
+    || !Number.isFinite(seconds)
+  ) {
+    return null;
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return {
+    atMs: date.getTime(),
+    date: `${yearRaw}-${monthRaw}-${dayRaw}`,
+  };
+}
+
+function normalizeBidHistory(historyRaw) {
+  const items = Array.isArray(historyRaw) ? historyRaw : [];
+  return items
+    .map((item) => {
+      const parsedDate = parseBidHistoryDateTime(item?.datetime || item?.date || item?.created_at || item?.createdAt);
+      const rawBid = item?.cpm ?? item?.bid ?? item?.value ?? item?.rate;
+      const bid = Number(
+        typeof rawBid === "string"
+          ? rawBid.replace(/[^\d,.-]/g, "").replace(",", ".")
+          : rawBid,
+      );
+      if (!parsedDate || !Number.isFinite(bid)) {
+        return null;
+      }
+      return {
+        atMs: parsedDate.atMs,
+        date: parsedDate.date,
+        bid,
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.atMs - right.atMs);
+}
+
+function buildWindowBounds(fromIsoRaw, toIsoRaw) {
+  const fromIso = String(fromIsoRaw || "").trim();
+  const toIso = String(toIsoRaw || fromIso || "").trim();
+  if (!fromIso || !toIso) {
+    return null;
+  }
+
+  const startMs = Date.parse(`${fromIso}T00:00:00.000Z`);
+  const endMs = Date.parse(`${toIso}T23:59:59.999Z`);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
+    return null;
+  }
+
+  return { startMs, endMs };
+}
+
+function resolveHistoryBidForWindow(historyRaw, fromIsoRaw, toIsoRaw, fallbackBidRaw) {
+  const bounds = buildWindowBounds(fromIsoRaw, toIsoRaw);
+  if (!bounds) {
+    const fallbackBid = Number(fallbackBidRaw);
+    return Number.isFinite(fallbackBid) ? fallbackBid : null;
+  }
+
+  const history = normalizeBidHistory(historyRaw);
+  const fallbackBid = Number(fallbackBidRaw);
+  if (!history.length) {
+    return Number.isFinite(fallbackBid) ? fallbackBid : null;
+  }
+
+  const { startMs, endMs } = bounds;
+  const entriesBeforeEnd = history.filter((entry) => entry.atMs <= endMs);
+  const entries = entriesBeforeEnd.length ? entriesBeforeEnd : history;
+
+  let currentBid = null;
+  for (const entry of entries) {
+    if (entry.atMs <= startMs) {
+      currentBid = entry.bid;
+    } else {
+      break;
+    }
+  }
+
+  if (!Number.isFinite(currentBid)) {
+    currentBid = Number.isFinite(entries[0]?.bid)
+      ? entries[0].bid
+      : Number.isFinite(history[0]?.bid)
+        ? history[0].bid
+        : Number.isFinite(fallbackBid)
+          ? fallbackBid
+          : null;
+  }
+
+  let weightedBidSum = 0;
+  let weightedDurationMs = 0;
+  let cursorMs = startMs;
+
+  for (const entry of entries) {
+    if (entry.atMs <= startMs) {
+      continue;
+    }
+    if (entry.atMs > endMs) {
+      break;
+    }
+
+    if (entry.atMs > cursorMs && Number.isFinite(currentBid)) {
+      const durationMs = entry.atMs - cursorMs;
+      weightedBidSum += currentBid * durationMs;
+      weightedDurationMs += durationMs;
+    }
+
+    currentBid = entry.bid;
+    cursorMs = entry.atMs;
+  }
+
+  if (cursorMs <= endMs && Number.isFinite(currentBid)) {
+    const durationMs = endMs - cursorMs + 1;
+    weightedBidSum += currentBid * durationMs;
+    weightedDurationMs += durationMs;
+  }
+
+  if (weightedDurationMs > 0) {
+    return weightedBidSum / weightedDurationMs;
+  }
+
+  return Number.isFinite(currentBid)
+    ? currentBid
+    : Number.isFinite(fallbackBid)
+      ? fallbackBid
+      : null;
+}
+
+async function fetchCampaignBidHistory(env, shopId, productId, campaignId, referer) {
+  const normalizedCampaignId = Number(campaignId) || 0;
+  if (!normalizedCampaignId || !shopId || !productId) {
+    return [];
+  }
+
+  try {
+    const payload = await xwayFetchJson(
+      env,
+      `/api/adv/shop/${shopId}/product/${productId}/campaign/${normalizedCampaignId}/bid-history`,
+      {
+        referer,
+        csrf: true,
+      },
+    );
+    return Array.isArray(payload) ? payload : [];
+  } catch {
+    return [];
+  }
+}
+
+async function applyBidHistoryToCampaigns(env, options) {
+  const {
+    shopId,
+    productId,
+    referer,
+    beforeDate,
+    duringStartDate,
+    duringEndDate,
+    afterDate,
+    beforeCampaigns,
+    duringCampaigns,
+    afterCampaigns,
+  } = options;
+
+  const uniqueCampaigns = new Map();
+  for (const campaign of [...beforeCampaigns, ...duringCampaigns, ...afterCampaigns]) {
+    const campaignId = Number(campaign?.id) || 0;
+    if (!campaignId || uniqueCampaigns.has(campaignId)) {
+      continue;
+    }
+    uniqueCampaigns.set(campaignId, campaign);
+  }
+
+  const bidHistoryEntries = await Promise.all(
+    [...uniqueCampaigns.values()].map(async (campaign) => [
+      Number(campaign.id) || 0,
+      await fetchCampaignBidHistory(env, shopId, productId, campaign.id, referer),
+    ]),
+  );
+  const bidHistoryByCampaignId = new Map(bidHistoryEntries);
+
+  const assignWindowBid = (campaigns, fromIso, toIso) =>
+    campaigns.map((campaign) => ({
+      ...campaign,
+      bid: resolveHistoryBidForWindow(
+        bidHistoryByCampaignId.get(Number(campaign.id) || 0),
+        fromIso,
+        toIso,
+        campaign.bid,
+      ),
+    }));
+
+  return {
+    before: assignWindowBid(beforeCampaigns, beforeDate, beforeDate),
+    during: assignWindowBid(duringCampaigns, duringStartDate, duringEndDate),
+    after: afterDate ? assignWindowBid(afterCampaigns, afterDate, afterDate) : afterCampaigns,
+  };
+}
+
 function normalizeCampaignRecord(campaign) {
   const rawSumPrice = campaign?.stat?.sum_price;
   const normalizedSumPrice = Number(
@@ -308,9 +533,22 @@ export async function onRequestGet(context) {
       ? afterCampaignsAll.filter((campaign) => matchCampaignRecord(campaign, campaignType, campaignExternalId))
       : [];
 
-    const beforeTotals = xwayAggregateCampaignStats(beforeCampaigns);
-    const duringTotals = xwayAggregateCampaignStats(duringCampaigns);
-    const afterTotals = hasAfterWindow ? xwayAggregateCampaignStats(afterCampaigns) : null;
+    const campaignsWithHistoryBid = await applyBidHistoryToCampaigns(env, {
+      shopId,
+      productId,
+      referer: productPageReferer,
+      beforeDate,
+      duringStartDate: startedDate,
+      duringEndDate,
+      afterDate,
+      beforeCampaigns,
+      duringCampaigns,
+      afterCampaigns,
+    });
+
+    const beforeTotals = xwayAggregateCampaignStats(campaignsWithHistoryBid.before);
+    const duringTotals = xwayAggregateCampaignStats(campaignsWithHistoryBid.during);
+    const afterTotals = hasAfterWindow ? xwayAggregateCampaignStats(campaignsWithHistoryBid.after) : null;
     const beforeMetrics = {
       ...xwayBuildConversionMetrics(beforeTotals),
       views: Number(beforeTotals?.views) || 0,
