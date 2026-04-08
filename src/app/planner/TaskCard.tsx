@@ -39,6 +39,7 @@ export function TaskCard({
   onOpenTask,
 }: TaskCardProps) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const handleRef = useRef<HTMLDivElement | null>(null);
   const suppressClickRef = useRef(false);
   const groupMeta = getGroupMeta(task.group);
   const containerId = getContainerId(containerSpec);
@@ -110,7 +111,10 @@ export function TaskCard({
     preview(getEmptyImage(), { captureDraggingState: true });
   }, [preview]);
 
-  drag(drop(ref));
+  useEffect(() => {
+    drag(handleRef);
+    drop(ref);
+  }, [drag, drop]);
 
   return (
     <div
@@ -131,7 +135,7 @@ export function TaskCard({
         }
       }}
       className={cn(
-        "group relative overflow-hidden border bg-white/95 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg select-none cursor-grab active:cursor-grabbing",
+        "group relative overflow-hidden border bg-white/95 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg select-none",
         groupMeta.borderClass,
         compact ? "px-2.5 py-2" : "px-3.5 py-3",
         variant === "calendar" ? "rounded-xl" : "rounded-2xl",
@@ -141,7 +145,12 @@ export function TaskCard({
       <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br opacity-90", groupMeta.surfaceClass)} />
       <div className="relative flex items-start gap-2">
         <div
-          className="rounded-md pt-0.5 text-slate-400"
+          ref={handleRef}
+          onClick={(event) => event.stopPropagation()}
+          className={cn(
+            "inline-flex shrink-0 items-center justify-center text-slate-400 cursor-grab active:cursor-grabbing",
+            compact ? "size-3.5" : "size-4",
+          )}
           aria-label={`Перетащить задачу ${task.title}`}
           title="Перетащить задачу"
         >

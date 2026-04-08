@@ -18,7 +18,7 @@ import {
 import { TaskGroupSection } from "@/app/planner/TaskGroupSection";
 import type { ContainerSpec, PlannerTask } from "@/app/planner/types";
 
-function CalendarEmptyGroupLane({
+function CalendarEmptyGroupChip({
   dateKey,
   groupId,
   participantId,
@@ -66,23 +66,25 @@ function CalendarEmptyGroupLane({
     <div
       ref={ref}
       className={cn(
-        "pointer-events-auto rounded-xl border bg-white/88 px-2 py-1.5 shadow-[0_10px_24px_-18px_rgba(15,23,42,0.45)] backdrop-blur-sm transition-all",
+        "pointer-events-auto flex min-h-9 items-center justify-between gap-2 rounded-2xl border bg-white/92 px-2.5 py-1.5 shadow-[0_10px_24px_-18px_rgba(15,23,42,0.32)] backdrop-blur-sm transition-all",
         groupMeta.borderClass,
         isOver && canDrop && "border-primary bg-primary/10 shadow-[0_0_0_1px_rgba(13,148,136,0.35)]",
       )}
     >
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <Badge
-          variant="outline"
-          className={cn("px-1.5 py-0 text-[9px] font-medium", groupMeta.badgeClass)}
-        >
-          {groupMeta.shortLabel}
-        </Badge>
-        <span className="text-[9px] text-slate-500">0</span>
-      </div>
-      <div className="rounded-lg border border-dashed border-slate-200/90 bg-slate-50/90 px-2 py-1.5 text-center text-[9px] font-medium text-slate-400">
-        Перетащить сюда
-      </div>
+      <Badge
+        variant="outline"
+        className={cn("px-1.5 py-0 text-[9px] font-medium", groupMeta.badgeClass)}
+      >
+        {groupMeta.shortLabel}
+      </Badge>
+      <span
+        className={cn(
+          "text-[10px] font-medium",
+          isOver && canDrop ? "text-primary" : "text-slate-400",
+        )}
+      >
+        {isOver && canDrop ? "Отпустите" : "Перетащить"}
+      </span>
     </div>
   );
 }
@@ -132,7 +134,7 @@ export function CalendarDayCell({
   return (
     <div
       className={cn(
-        "relative min-h-[168px] rounded-[24px] border bg-white/80 p-3 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.45)] backdrop-blur-sm transition-colors",
+        "relative min-h-[168px] overflow-hidden rounded-[24px] border bg-white/80 p-3 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.45)] backdrop-blur-sm transition-colors",
         isDateToday(date) ? "border-primary/60 bg-primary/6" : "border-white/70",
       )}
     >
@@ -174,22 +176,26 @@ export function CalendarDayCell({
           />
         ))}
       </div>
-      <div
-        className={cn(
-          "pointer-events-none absolute inset-x-3 bottom-3 flex flex-col justify-end gap-1.5 transition-opacity",
-          isAnyDragging ? "opacity-100" : "opacity-0",
-        )}
-      >
-        {emptyGroups.map(({ group }) => (
-          <CalendarEmptyGroupLane
-            key={`empty-${participantId}-${dateKey}-${group.id}`}
-            dateKey={dateKey}
-            groupId={group.id}
-            participantId={participantId}
-            onMoveTask={onMoveTask}
-          />
-        ))}
-      </div>
+      {isAnyDragging && emptyGroups.length > 0 ? (
+        <div className="pointer-events-none absolute inset-x-2 bottom-2 top-11 z-20 rounded-[20px] border border-white/70 bg-white/55 p-2 shadow-[0_18px_36px_-24px_rgba(15,23,42,0.28)] backdrop-blur-[4px]">
+          <div
+            className={cn(
+              "grid content-start gap-1.5",
+              emptyGroups.length === 1 ? "grid-cols-1" : "grid-cols-2",
+            )}
+          >
+            {emptyGroups.map(({ group }) => (
+              <CalendarEmptyGroupChip
+                key={`empty-${participantId}-${dateKey}-${group.id}`}
+                dateKey={dateKey}
+                groupId={group.id}
+                participantId={participantId}
+                onMoveTask={onMoveTask}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
