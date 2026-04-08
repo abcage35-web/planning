@@ -4,6 +4,16 @@ export type ParticipantId = "sasha-nekrasov" | "sasha-manokhin" | "anton-bober";
 
 export type TaskStatus = "bank" | "calendar";
 export type TaskProgressStatus = "cancelled" | "in-progress" | "done";
+export type TaskRecurrenceFrequency = "none" | "daily" | "weekly" | "monthly";
+export type TaskRecurrenceUntilMode = "forever" | "until";
+
+export interface TaskRecurrence {
+  frequency: TaskRecurrenceFrequency;
+  interval: number;
+  weekdays: number[];
+  untilMode: TaskRecurrenceUntilMode;
+  untilDate: string;
+}
 
 export interface PlannerSettings {
   workHoursPerDay: number;
@@ -13,6 +23,8 @@ export interface PlannerTask {
   id: string;
   seriesId: string;
   seriesAssignees: ParticipantId[];
+  recurrenceGroupId: string | null;
+  recurrence: TaskRecurrence;
   progressStatus: TaskProgressStatus;
   title: string;
   description: string;
@@ -51,6 +63,7 @@ export interface PlannerTaskInput {
   assignees: ParticipantId[];
   date: string | null;
   status: TaskStatus;
+  recurrence: TaskRecurrence;
 }
 
 export interface TaskFormValues {
@@ -62,6 +75,7 @@ export interface TaskFormValues {
   assignees: ParticipantId[];
   date: string;
   status: TaskStatus;
+  recurrence: TaskRecurrence;
 }
 
 export interface PlannerSaveSummary {

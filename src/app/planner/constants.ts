@@ -1,4 +1,9 @@
-import type { TaskFormValues, TaskProgressStatus } from "./types";
+import type {
+  TaskFormValues,
+  TaskProgressStatus,
+  TaskRecurrence,
+  TaskRecurrenceFrequency,
+} from "./types";
 
 export const PARTICIPANTS = [
   {
@@ -96,6 +101,24 @@ export const TASK_PROGRESS_STATUSES: {
   },
 ];
 
+export const RECURRENCE_FREQUENCIES: {
+  id: TaskRecurrenceFrequency;
+  label: string;
+}[] = [
+  { id: "none", label: "Не повторять" },
+  { id: "daily", label: "Повторять по дням" },
+  { id: "weekly", label: "Повторять по неделям" },
+  { id: "monthly", label: "Повторять по месяцам" },
+];
+
+export const DEFAULT_TASK_RECURRENCE: TaskRecurrence = {
+  frequency: "none",
+  interval: 1,
+  weekdays: [],
+  untilMode: "forever",
+  untilDate: "",
+};
+
 export const DEFAULT_TASK_FORM_VALUES: TaskFormValues = {
   title: "",
   description: "",
@@ -105,4 +128,5 @@ export const DEFAULT_TASK_FORM_VALUES: TaskFormValues = {
   assignees: [],
   date: "",
   status: "bank",
+  recurrence: DEFAULT_TASK_RECURRENCE,
 };

@@ -40,6 +40,7 @@ import {
   DEFAULT_WORK_HOURS_PER_DAY,
   DEFAULT_TASK_FORM_VALUES,
   PARTICIPANTS,
+  RECURRENCE_FREQUENCIES,
   TASK_GROUPS,
   WEEKDAY_LABELS,
 } from "@/app/planner/constants";
@@ -59,6 +60,7 @@ import {
   getParticipantName,
   getParticipantNames,
   getPlannerSettings,
+  getRecurrenceSummary,
   getScheduledTaskCount,
   getTaskSeriesAssignees,
   getTaskSeriesTasks,
@@ -155,6 +157,10 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
   const selectedAssigneeNames = useMemo(
     () => getParticipantNames(formValues.assignees),
     [formValues.assignees],
+  );
+  const recurrenceSummary = useMemo(
+    () => getRecurrenceSummary(formValues.recurrence, formValues.date),
+    [formValues.date, formValues.recurrence],
   );
 
   const queueSave = useCallback((nextState: PlannerState, summary: PlannerSaveSummary) => {
@@ -368,7 +374,7 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
   const handleTaskMove = useCallback(
     (taskId: string, containerSpec: ContainerSpec, targetIndex: number) => {
       applyTaskMutation(
-        (tasks) => moveTaskToContainer(tasks, taskId, containerSpec, targetIndex),
+        (tasks) => moveTaskToContainer(tasks, taskId, containerSpec, targetIndex, currentMonth),
         {
           action: "move",
           message: "Обновлено положение задачи",
@@ -376,7 +382,7 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
         },
       );
     },
-    [applyTaskMutation],
+    [applyTaskMutation, currentMonth],
   );
 
   const handleTaskProgressStatusToggle = useCallback(
@@ -476,10 +482,30 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
       return;
     }
 
+    if (
+      input.recurrence.frequency !== "none" &&
+      input.recurrence.untilMode === "until" &&
+      !input.recurrence.untilDate
+    ) {
+      setFormError("Укажите дату окончания повторения.");
+      return;
+    }
+
+    if (
+      input.recurrence.frequency !== "none" &&
+      input.date &&
+      input.recurrence.untilMode === "until" &&
+      input.recurrence.untilDate &&
+      input.recurrence.untilDate < input.date
+    ) {
+      setFormError("Дата окончания повторения не может быть раньше даты задачи.");
+      return;
+    }
+
     setFormError(null);
 
     applyTaskMutation(
-      (tasks) => clonePlannerTask(tasks, selectedTask.id, input),
+      (tasks) => clonePlannerTask(tasks, selectedTask.id, input, currentMonth),
       {
         action: "clone",
         message:
@@ -515,6 +541,26 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
       return;
     }
 
+    if (
+      input.recurrence.frequency !== "none" &&
+      input.recurrence.untilMode === "until" &&
+      !input.recurrence.untilDate
+    ) {
+      setFormError("Укажите дату окончания повторения.");
+      return;
+    }
+
+    if (
+      input.recurrence.frequency !== "none" &&
+      input.date &&
+      input.recurrence.untilMode === "until" &&
+      input.recurrence.untilDate &&
+      input.recurrence.untilDate < input.date
+    ) {
+      setFormError("Дата окончания повторения не может быть раньше даты задачи.");
+      return;
+    }
+
     setFormError(null);
 
     const editingTaskId = dialogState.taskId;
@@ -525,7 +571,7 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
           ? "Новая задача создана"
           : "Задача обновлена";
     applyTaskMutation(
-      (tasks) => upsertPlannerTask(tasks, input, editingTaskId),
+      (tasks) => upsertPlannerTask(tasks, input, currentMonth, editingTaskId),
       {
         action: dialogState.mode === "create" ? "create" : "update",
         message: saveMessage,
@@ -1034,6 +1080,187 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
                     </p>
                   </div>
 
+                  <div className="space-y-3 rounded-[24px] border border-slate-200 bg-slate-50/70 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Повторение
+                      </Label>
+                      <span className="text-xs text-slate-400">{recurrenceSummary}</span>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_112px]">
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="task-recurrence-frequency"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Тип повторения
+                        </Label>
+                        <select
+                          id="task-recurrence-frequency"
+                          value={formValues.recurrence.frequency}
+                          onChange={(event) =>
+                            setFormValues((current) => ({
+                              ...current,
+                              recurrence: {
+                                ...current.recurrence,
+                                frequency: event.target.value as typeof current.recurrence.frequency,
+                              },
+                            }))
+                          }
+                          className="flex h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+                        >
+                          {RECURRENCE_FREQUENCIES.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="task-recurrence-interval"
+                          className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          Каждый
+                        </Label>
+                        <Input
+                          id="task-recurrence-interval"
+                          type="number"
+                          min="1"
+                          max="52"
+                          step="1"
+                          className="h-11 rounded-2xl border-slate-200 bg-white text-sm shadow-none"
+                          value={String(formValues.recurrence.interval)}
+                          onChange={(event) =>
+                            setFormValues((current) => ({
+                              ...current,
+                              recurrence: {
+                                ...current.recurrence,
+                                interval: Math.max(1, Number(event.target.value) || 1),
+                              },
+                            }))
+                          }
+                          disabled={formValues.recurrence.frequency === "none"}
+                        />
+                      </div>
+                    </div>
+
+                    {formValues.recurrence.frequency === "weekly" ? (
+                      <div className="space-y-2">
+                        <Label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Дни недели
+                        </Label>
+                        <div className="flex flex-wrap gap-2">
+                          {WEEKDAY_LABELS.map((weekday, weekdayIndex) => {
+                            const selected = formValues.recurrence.weekdays.includes(weekdayIndex);
+
+                            return (
+                              <button
+                                key={`repeat-weekday-${weekday}`}
+                                type="button"
+                                onClick={() =>
+                                  setFormValues((current) => ({
+                                    ...current,
+                                    recurrence: {
+                                      ...current.recurrence,
+                                      weekdays: selected
+                                        ? current.recurrence.weekdays.filter((day) => day !== weekdayIndex)
+                                        : [...current.recurrence.weekdays, weekdayIndex].sort((left, right) => left - right),
+                                    },
+                                  }))
+                                }
+                                className={cn(
+                                  "rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
+                                  selected
+                                    ? "border-amber-300 bg-amber-100 text-amber-900 shadow-[0_10px_18px_-16px_rgba(217,119,6,0.7)]"
+                                    : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-900",
+                                )}
+                              >
+                                {weekday}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormValues((current) => ({
+                            ...current,
+                            recurrence: {
+                              ...current.recurrence,
+                              untilMode: "forever",
+                            },
+                          }))
+                        }
+                        className={cn(
+                          "rounded-[20px] border px-4 py-3 text-left transition-all",
+                          formValues.recurrence.untilMode === "forever"
+                            ? "border-slate-900 bg-slate-900 text-white shadow-[0_12px_24px_-18px_rgba(15,23,42,0.8)]"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                        )}
+                        disabled={formValues.recurrence.frequency === "none"}
+                      >
+                        <div className="text-sm font-semibold">Всегда</div>
+                        <div className="mt-1 text-xs opacity-80">Без даты окончания</div>
+                      </button>
+
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormValues((current) => ({
+                              ...current,
+                              recurrence: {
+                                ...current.recurrence,
+                                untilMode: "until",
+                              },
+                            }))
+                          }
+                          className={cn(
+                            "w-full rounded-[20px] border px-4 py-3 text-left transition-all",
+                            formValues.recurrence.untilMode === "until"
+                              ? "border-primary bg-primary/10 text-slate-900 shadow-[0_12px_24px_-18px_rgba(13,148,136,0.5)]"
+                              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                          )}
+                          disabled={formValues.recurrence.frequency === "none"}
+                        >
+                          <div className="text-sm font-semibold">До даты</div>
+                          <div className="mt-1 text-xs opacity-80">Ограничить повторение</div>
+                        </button>
+                        <Input
+                          type="date"
+                          min={formValues.date || monthRange.min}
+                          value={formValues.recurrence.untilDate}
+                          onChange={(event) =>
+                            setFormValues((current) => ({
+                              ...current,
+                              recurrence: {
+                                ...current.recurrence,
+                                untilDate: event.target.value,
+                              },
+                            }))
+                          }
+                          disabled={
+                            formValues.recurrence.frequency === "none" ||
+                            formValues.recurrence.untilMode !== "until"
+                          }
+                          className="h-11 rounded-2xl border-slate-200 bg-white text-sm shadow-none"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-xs leading-5 text-slate-500">
+                      Повторение работает для задач с датой в календаре. Время суток не
+                      учитывается, повторяются только даты.
+                    </p>
+                  </div>
+
                   <div className="space-y-2">
                     <Label
                       htmlFor="task-description"
@@ -1124,6 +1351,7 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
                           ? `Исполнители: ${selectedAssigneeNames.join(", ")}`
                           : "Исполнители пока не выбраны."}
                       </p>
+                      <p>Повторение: {recurrenceSummary}</p>
                       {selectedTask ? (
                         <p>
                           Сейчас:{" "}

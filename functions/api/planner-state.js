@@ -10,6 +10,7 @@ const LOG_FILE = resolve(STORAGE_DIR, "planner-state-log.ndjson");
 const TASK_GROUPS = new Set(["planned", "new", "project", "meeting", "undefined"]);
 const PARTICIPANTS = new Set(["sasha-nekrasov", "sasha-manokhin", "anton-bober"]);
 const TASK_PROGRESS_STATUSES = new Set(["cancelled", "in-progress", "done"]);
+const TASK_RECURRENCE_FREQUENCIES = new Set(["none", "daily", "weekly", "monthly"]);
 const DEFAULT_WORK_HOURS_PER_DAY = 8;
 
 const DEFAULT_TASKS = [
@@ -141,6 +142,44 @@ function toWorkHours(valueRaw) {
   return Math.max(1, Math.min(24, Math.round(value * 10) / 10));
 }
 
+function toRecurrenceFrequency(valueRaw) {
+  const value = toSafeString(valueRaw, 40).toLowerCase();
+  return TASK_RECURRENCE_FREQUENCIES.has(value) ? value : "none";
+}
+
+function toWeekdays(valueRaw) {
+  if (!Array.isArray(valueRaw)) {
+    return [];
+  }
+
+  return valueRaw
+    .map((value) => Number(value))
+    .filter((value, index, values) => Number.isInteger(value) && value >= 0 && value <= 6 && values.indexOf(value) === index);
+}
+
+function sanitizeRecurrence(recurrenceRaw, dateValue) {
+  const raw = recurrenceRaw && typeof recurrenceRaw === "object" ? recurrenceRaw : {};
+  const frequency = toRecurrenceFrequency(raw.frequency);
+  const interval = Math.max(1, Math.min(52, Math.round(Number(raw.interval) || 1)));
+  const weekdays = toWeekdays(raw.weekdays);
+  const weekdayFromDate = dateValue ? (new Date(dateValue).getDay() + 6) % 7 : null;
+
+  return {
+    frequency,
+    interval,
+    weekdays:
+      frequency === "weekly"
+        ? weekdays.length > 0
+          ? weekdays
+          : weekdayFromDate !== null
+            ? [weekdayFromDate]
+            : []
+        : weekdays,
+    untilMode: toSafeString(raw.untilMode, 20).toLowerCase() === "until" ? "until" : "forever",
+    untilDate: toDate(raw.untilDate) || "",
+  };
+}
+
 function sanitizeTask(taskRaw, index) {
   const raw = taskRaw && typeof taskRaw === "object" ? taskRaw : {};
   const createdAt = toIsoOrNow(raw.createdAt);
@@ -149,11 +188,14 @@ function sanitizeTask(taskRaw, index) {
   const date = toDate(raw.date);
   const seriesId = toSafeString(raw.seriesId, 120) || toSafeString(raw.id, 120) || `series-${Date.now()}-${index}`;
   const seriesAssignees = toParticipantList(raw.seriesAssignees);
+  const recurrence = sanitizeRecurrence(raw.recurrence, date);
 
   return {
     id: toSafeString(raw.id, 120) || `task-${Date.now()}-${index}`,
     seriesId,
     seriesAssignees: seriesAssignees.length > 0 ? seriesAssignees : assignee ? [assignee] : [],
+    recurrenceGroupId: toSafeString(raw.recurrenceGroupId, 120) || null,
+    recurrence,
     title: toSafeString(raw.title, 180),
     description: toSafeString(raw.description, 4000),
     link: toSafeString(raw.link, 1000),
