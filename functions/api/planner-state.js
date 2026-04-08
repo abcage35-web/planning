@@ -363,6 +363,38 @@ function summarizeState(payload) {
   };
 }
 
+function buildTaskLogSnapshot(payload, changedTaskId) {
+  const tasks = Array.isArray(payload?.tasks) ? payload.tasks : [];
+  const taskId = toSafeString(changedTaskId, 120);
+
+  if (!taskId) {
+    return null;
+  }
+
+  const changedTask = tasks.find((task) => task?.id === taskId);
+  if (!changedTask) {
+    return null;
+  }
+
+  const familyId = toSafeString(changedTask?.recurrenceGroupId, 120) || getSeriesId(changedTask);
+  const familyTasks = tasks.filter((task) => {
+    const taskFamilyId = toSafeString(task?.recurrenceGroupId, 120) || getSeriesId(task);
+    return taskFamilyId === familyId;
+  });
+
+  return {
+    id: changedTask.id,
+    title: changedTask.title,
+    status: changedTask.status,
+    group: changedTask.group,
+    assignee: changedTask.assignee,
+    seriesAssignees: getSeriesAssignees(changedTask),
+    date: changedTask.date,
+    recurrence: changedTask.recurrence,
+    familySize: familyTasks.length,
+  };
+}
+
 async function loadStateFromDisk() {
   if (!existsSync(STATE_FILE)) {
     const defaultState = buildDefaultState();
@@ -426,6 +458,7 @@ export async function onRequestPut(context) {
       action,
       taskId: changedTaskId,
       summary,
+      taskSnapshot: buildTaskLogSnapshot(payload, changedTaskId),
       ...summarizeState(payload),
     });
 

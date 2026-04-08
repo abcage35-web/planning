@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -145,7 +145,10 @@ function createLocalFunctionsPlugin() {
       }
 
       try {
-        const moduleUrl = pathToFileURL(resolve(__dirname, entryRelativePath)).href;
+        const entryAbsolutePath = resolve(__dirname, entryRelativePath);
+        const cacheBust =
+          existsSync(entryAbsolutePath) ? String(statSync(entryAbsolutePath).mtimeMs) : String(Date.now());
+        const moduleUrl = `${pathToFileURL(entryAbsolutePath).href}?t=${cacheBust}`;
         const module = await import(moduleUrl);
         const handler = module[handlerName];
 

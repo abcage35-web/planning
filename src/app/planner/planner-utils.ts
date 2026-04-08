@@ -636,6 +636,9 @@ export function moveTaskToContainer(
     const currentList = [...(containerMap.get(containerId) || [])];
     const insertIndex = clamp(targetIndex, 0, currentList.length);
     currentList.splice(insertIndex, 0, ...sortPlannerTasks(movedTasks));
+    currentList.forEach((task, index) => {
+      task.order = index;
+    });
     containerMap.set(containerId, currentList);
   }
 
