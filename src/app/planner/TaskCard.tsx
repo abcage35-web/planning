@@ -40,27 +40,17 @@ export function TaskCard({
 }: TaskCardProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const handleRef = useRef<HTMLDivElement | null>(null);
-  const suppressClickRef = useRef(false);
   const groupMeta = getGroupMeta(task.group);
   const containerId = getContainerId(containerSpec);
 
   const [{ isDragging }, drag, preview] = useDrag(
     () => ({
       type: TASK_ITEM_TYPE,
-      item: () => {
-        suppressClickRef.current = true;
-
-        return {
-          taskId: task.id,
-          containerId,
-          index,
-        } satisfies DragTaskItem;
-      },
-      end: () => {
-        window.setTimeout(() => {
-          suppressClickRef.current = false;
-        }, 0);
-      },
+      item: {
+        taskId: task.id,
+        containerId,
+        index,
+      } satisfies DragTaskItem,
       collect: (monitor) => ({
         isDragging: monitor.isDragging(),
       }),
@@ -121,13 +111,7 @@ export function TaskCard({
       ref={ref}
       role="button"
       tabIndex={0}
-      onClick={() => {
-        if (suppressClickRef.current) {
-          return;
-        }
-
-        onOpenTask(task);
-      }}
+      onClick={() => onOpenTask(task)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
@@ -135,7 +119,7 @@ export function TaskCard({
         }
       }}
       className={cn(
-        "group relative overflow-hidden border bg-white/95 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg select-none",
+        "group relative cursor-pointer overflow-hidden border bg-white/95 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg select-none",
         groupMeta.borderClass,
         compact ? "px-2.5 py-2" : "px-3.5 py-3",
         variant === "calendar" ? "rounded-xl" : "rounded-2xl",
