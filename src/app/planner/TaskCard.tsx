@@ -21,7 +21,8 @@ import {
   formatHours,
   getContainerId,
   getDisplayDay,
-  getShortParticipantName,
+  getShortParticipantNames,
+  getTaskSeriesAssignees,
 } from "@/app/planner/planner-utils";
 import type { ContainerSpec, PlannerTask, TaskProgressStatus } from "@/app/planner/types";
 
@@ -81,6 +82,8 @@ export function TaskCard({
   const progressMeta = getTaskProgressMeta(getTaskProgressStatus(task));
   const ProgressIcon = progressMeta.icon;
   const containerId = getContainerId(containerSpec);
+  const taskAssignees = getTaskSeriesAssignees(task);
+  const assigneeLabels = getShortParticipantNames(taskAssignees);
 
   const [{ isDragging }, drag, preview] = useDrag(
     () => ({
@@ -225,12 +228,15 @@ export function TaskCard({
             </p>
           ) : null}
           <div className={cn("flex flex-wrap items-center gap-1.5", compact ? "mt-1.5" : "mt-2")}>
-            {task.assignee ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/80 bg-white/75 px-2 py-0.5 text-[10px] text-slate-700">
+            {assigneeLabels.map((label) => (
+              <span
+                key={`${task.id}-${label}`}
+                className="inline-flex items-center gap-1 rounded-full border border-white/80 bg-white/75 px-2 py-0.5 text-[10px] text-slate-700"
+              >
                 <UserRound className="size-3" />
-                {getShortParticipantName(task.assignee)}
+                {label}
               </span>
-            ) : null}
+            ))}
             {task.date ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-white/80 bg-white/75 px-2 py-0.5 text-[10px] text-slate-700">
                 <CalendarDays className="size-3" />

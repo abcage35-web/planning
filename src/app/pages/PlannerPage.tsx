@@ -2,7 +2,7 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { format, parseISO } from "date-fns";
-import { CalendarRange, Clock3, Plus, Save, Trash2 } from "lucide-react";
+import { CalendarRange, Clock3, Copy, Plus, Save, Trash2 } from "lucide-react";
 
 import { Badge } from "@/app/components/ui/badge";
 import {
@@ -48,6 +48,7 @@ import { TaskGroupSection } from "@/app/planner/TaskGroupSection";
 import {
   buildMonthGrid,
   buildTaskInput,
+  clonePlannerTask,
   createEmptyPlannerState,
   createTaskFormValues,
   deletePlannerTask,
@@ -447,6 +448,49 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
     setDeleteConfirmOpen(false);
     setDialogState({ open: false, mode: "create" });
   }, [applyTaskMutation, dialogState.taskId, selectedTaskSeries.length]);
+
+  const handleCloneTask = useCallback(() => {
+    if (!selectedTask) {
+      return;
+    }
+
+    const input = buildTaskInput(formValues);
+
+    if (!input.title) {
+      setFormError("Укажите название задачи.");
+      return;
+    }
+
+    if (formValues.status === "calendar" && input.assignees.length === 0) {
+      setFormError("Выберите хотя бы одного исполнителя.");
+      return;
+    }
+
+    if (formValues.status === "calendar" && !input.date) {
+      setFormError("Выберите дату для задачи в календаре.");
+      return;
+    }
+
+    if (input.date && !isDateWithinCurrentMonth(input.date, currentMonth)) {
+      setFormError("Дата задачи должна попадать в текущий месяц календаря.");
+      return;
+    }
+
+    setFormError(null);
+
+    applyTaskMutation(
+      (tasks) => clonePlannerTask(tasks, selectedTask.id, input),
+      {
+        action: "clone",
+        message:
+          input.assignees.length > 1 && input.date
+            ? `Клон задачи создан на ${input.assignees.length} календарях.`
+            : "Задача клонирована",
+        taskId: selectedTask.id,
+      },
+    );
+    setDialogState({ open: false, mode: "create" });
+  }, [applyTaskMutation, currentMonth, formValues, selectedTask]);
 
   const handleTaskSave = useCallback(() => {
     const input = buildTaskInput(formValues);
@@ -1112,10 +1156,16 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
             <DialogFooter className="border-t border-slate-200/80 px-6 py-4 sm:justify-between">
               <div className="flex items-center gap-2">
                 {dialogState.mode === "edit" ? (
-                  <Button variant="destructive" className="rounded-2xl" onClick={handleDeleteTask}>
-                    <Trash2 className="size-4" />
-                    Удалить
-                  </Button>
+                  <>
+                    <Button variant="outline" className="rounded-2xl" onClick={handleCloneTask}>
+                      <Copy className="size-4" />
+                      Клонировать
+                    </Button>
+                    <Button variant="destructive" className="rounded-2xl" onClick={handleDeleteTask}>
+                      <Trash2 className="size-4" />
+                      Удалить
+                    </Button>
+                  </>
                 ) : null}
               </div>
 

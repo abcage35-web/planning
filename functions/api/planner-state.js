@@ -181,6 +181,59 @@ function sortTasks(tasksRaw) {
   });
 }
 
+function getSeriesId(task) {
+  return toSafeString(task?.seriesId, 120) || toSafeString(task?.id, 120);
+}
+
+function getSeriesAssignees(task) {
+  const seriesAssignees = toParticipantList(task?.seriesAssignees);
+  if (seriesAssignees.length > 0) {
+    return seriesAssignees;
+  }
+
+  return task?.assignee ? [task.assignee] : [];
+}
+
+function collapseBankSeriesTasks(tasksRaw) {
+  const tasks = Array.isArray(tasksRaw) ? tasksRaw : [];
+  const calendarTasks = [];
+  const bankSeriesMap = new Map();
+
+  for (const task of tasks) {
+    if (task?.status === "bank") {
+      const seriesId = getSeriesId(task);
+      const list = bankSeriesMap.get(seriesId) || [];
+      list.push(task);
+      bankSeriesMap.set(seriesId, list);
+      continue;
+    }
+
+    calendarTasks.push(task);
+  }
+
+  const collapsedBankTasks = [];
+
+  for (const seriesTasks of bankSeriesMap.values()) {
+    const orderedSeriesTasks = sortTasks(seriesTasks);
+    const representativeTask = orderedSeriesTasks[0];
+    const assignees = orderedSeriesTasks.flatMap((task) => getSeriesAssignees(task));
+    const uniqueAssignees = assignees.filter(
+      (value, index, values) => value && values.indexOf(value) === index,
+    );
+
+    collapsedBankTasks.push({
+      ...representativeTask,
+      seriesId: getSeriesId(representativeTask),
+      seriesAssignees: uniqueAssignees,
+      assignee: uniqueAssignees.length === 1 ? uniqueAssignees[0] : null,
+      date: null,
+      status: "bank",
+    });
+  }
+
+  return [...calendarTasks, ...collapsedBankTasks];
+}
+
 function containerKey(task) {
   if (task.status === "calendar" && task.assignee && task.date) {
     return `calendar:${task.assignee}:${task.date}:${task.group}`;
@@ -216,7 +269,8 @@ function normalizeOrders(tasksRaw) {
 function sanitizeState(payloadRaw) {
   const payload = payloadRaw && typeof payloadRaw === "object" ? payloadRaw : {};
   const tasksSource = Array.isArray(payload.tasks) ? payload.tasks : [];
-  const tasks = normalizeOrders(tasksSource.map((task, index) => sanitizeTask(task, index)));
+  const sanitizedTasks = tasksSource.map((task, index) => sanitizeTask(task, index));
+  const tasks = normalizeOrders(collapseBankSeriesTasks(sanitizedTasks));
   const updatedAt = toIsoOrNow(payload.updatedAt);
   const createdAt = toIsoOrNow(payload.createdAt, updatedAt);
 

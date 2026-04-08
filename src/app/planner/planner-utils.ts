@@ -217,6 +217,39 @@ export function getParticipantNames(participantIds: ParticipantId[]) {
   return uniqueParticipantIds(participantIds).map((participantId) => getParticipantName(participantId));
 }
 
+export function getShortParticipantNames(participantIds: ParticipantId[]) {
+  return uniqueParticipantIds(participantIds).map((participantId) =>
+    getShortParticipantName(participantId),
+  );
+}
+
+function getSeriesParticipantIds(tasks: PlannerTask[]) {
+  return uniqueParticipantIds(tasks.flatMap((task) => getTaskFallbackAssignees(task)));
+}
+
+function buildCollapsedBankSeriesTask(
+  seriesTasks: PlannerTask[],
+  sourceTask: PlannerTask,
+  targetGroup: PlannerTask["group"],
+  updatedAt: string,
+) {
+  const assignees = getSeriesParticipantIds(seriesTasks);
+  const representativeTask =
+    seriesTasks.find((task) => task.id === sourceTask.id) || sortPlannerTasks(seriesTasks)[0];
+
+  return {
+    ...representativeTask,
+    seriesId: getTaskSeriesId(representativeTask),
+    seriesAssignees: assignees,
+    progressStatus: getTaskProgressStatus(representativeTask),
+    assignee: assignees.length === 1 ? assignees[0] : null,
+    date: null,
+    status: "bank" as const,
+    group: targetGroup,
+    updatedAt,
+  };
+}
+
 function patchTaskWithContainer(task: PlannerTask, spec: ContainerSpec) {
   if (spec.kind === "calendar") {
     return {
@@ -269,32 +302,54 @@ export function moveTaskToContainer(
     .map((task) => ({ ...task }));
   const containerMap = buildContainerMap(remainingTasks);
   const movedTasksByContainer = new Map<string, PlannerTask[]>();
+  const seriesAssignees = getSeriesParticipantIds(tasksToMove);
 
-  for (const task of sortPlannerTasks(tasksToMove)) {
-    const nextSpec =
-      targetSpec.kind === "calendar"
-        ? {
-            kind: "calendar" as const,
-            group: targetSpec.group,
-            assignee: task.assignee || targetSpec.assignee,
-            date: targetSpec.date,
-          }
-        : targetSpec;
-
-    const movedTask = patchTaskWithContainer(
-      {
-        ...task,
-        updatedAt: nowIso,
-        seriesId: getTaskSeriesId(task),
-        seriesAssignees: getTaskFallbackAssignees(task),
-        progressStatus: getTaskProgressStatus(task),
-      },
-      nextSpec,
+  if (targetSpec.kind === "bank") {
+    const movedTask = buildCollapsedBankSeriesTask(
+      tasksToMove,
+      sourceTask,
+      targetSpec.group,
+      nowIso,
     );
     const containerId = getTaskContainerId(movedTask);
-    const list = movedTasksByContainer.get(containerId) || [];
-    list.push(movedTask);
-    movedTasksByContainer.set(containerId, list);
+    movedTasksByContainer.set(containerId, [movedTask]);
+  } else {
+    const calendarAssignees =
+      seriesAssignees.length > 0
+        ? seriesAssignees
+        : targetSpec.assignee
+          ? [targetSpec.assignee]
+          : [];
+
+    calendarAssignees.forEach((assignee, index) => {
+      const previousSibling =
+        tasksToMove.find((task) => task.assignee === assignee) ||
+        (index === 0 ? sourceTask : null);
+      const baseTask = previousSibling || sourceTask;
+      const movedTask = patchTaskWithContainer(
+        {
+          ...baseTask,
+          id: previousSibling?.id || (index === 0 ? sourceTask.id : makeTaskId()),
+          updatedAt: nowIso,
+          seriesId: movedSeriesId,
+          seriesAssignees:
+            calendarAssignees.length > 0
+              ? calendarAssignees
+              : getTaskFallbackAssignees(baseTask),
+          progressStatus: getTaskProgressStatus(baseTask),
+        },
+        {
+          kind: "calendar",
+          group: targetSpec.group,
+          assignee,
+          date: targetSpec.date,
+        },
+      );
+      const containerId = getTaskContainerId(movedTask);
+      const list = movedTasksByContainer.get(containerId) || [];
+      list.push(movedTask);
+      movedTasksByContainer.set(containerId, list);
+    });
   }
 
   for (const [containerId, movedTasks] of movedTasksByContainer.entries()) {
@@ -355,6 +410,31 @@ export function cycleTaskProgressStatus(status: TaskProgressStatus) {
   return "in-progress" satisfies TaskProgressStatus;
 }
 
+export function clonePlannerTask(
+  tasks: PlannerTask[],
+  taskId: string,
+  input: PlannerTaskInput,
+) {
+  const sourceTask = tasks.find((task) => task.id === taskId);
+  if (!sourceTask) {
+    return tasks;
+  }
+
+  const nextTasks = upsertPlannerTask(tasks, input);
+  const previousTaskIds = new Set(tasks.map((task) => task.id));
+  const createdTask = nextTasks.find((task) => !previousTaskIds.has(task.id));
+
+  if (!createdTask) {
+    return nextTasks;
+  }
+
+  return updateTaskSeriesProgressStatus(
+    nextTasks,
+    createdTask.id,
+    getTaskProgressStatus(sourceTask),
+  );
+}
+
 export function buildTaskInput(values: TaskFormValues): PlannerTaskInput {
   const hoursValue = Number(values.hours);
   const assignees = uniqueParticipantIds(values.assignees);
@@ -392,7 +472,9 @@ export function upsertPlannerTask(
 
   const scheduleToCalendars = shouldScheduleTask(input);
   const seriesAssignees = uniqueParticipantIds(input.assignees);
-  const assignees = scheduleToCalendars ? seriesAssignees : [seriesAssignees[0] ?? null];
+  const assignees = scheduleToCalendars
+    ? seriesAssignees
+    : [seriesAssignees.length === 1 ? seriesAssignees[0] : null];
 
   const createdTasks = assignees.map((assignee, index) => {
     const previousSibling =
