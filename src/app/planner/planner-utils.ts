@@ -70,7 +70,7 @@ function getTaskFallbackAssignees(task: Pick<PlannerTask, "assignee"> & Partial<
 }
 
 function shouldScheduleTask(input: PlannerTaskInput) {
-  return input.assignees.length > 0 && Boolean(input.date);
+  return input.status === "calendar" && input.assignees.length > 0 && Boolean(input.date);
 }
 
 function uniqueWeekdays(weekdays?: number[] | null) {
@@ -126,6 +126,10 @@ function isRecurringTask(recurrence: TaskRecurrence) {
 
 function getTaskRecurrenceGroupId(task: Partial<Pick<PlannerTask, "recurrenceGroupId">>) {
   return task.recurrenceGroupId || null;
+}
+
+function getLinkedTaskIds(tasks: PlannerTask[], taskId: string) {
+  return new Set(getTaskLinkedTasks(tasks, taskId).map((task) => task.id));
 }
 
 function describeWeeklyRecurrence(weekdays: number[]) {
@@ -233,6 +237,29 @@ function getRecurringDates(
   return dates;
 }
 
+function moveRecurrenceToDate(
+  recurrence: TaskRecurrence,
+  targetDateKey?: string,
+) {
+  if (recurrence.frequency !== "weekly" || !targetDateKey) {
+    return recurrence;
+  }
+
+  const weekdayIndex = getWeekdayIndexFromDate(targetDateKey);
+  if (weekdayIndex === null) {
+    return recurrence;
+  }
+
+  if (recurrence.weekdays.length > 1 && recurrence.weekdays.includes(weekdayIndex)) {
+    return recurrence;
+  }
+
+  return {
+    ...recurrence,
+    weekdays: [weekdayIndex],
+  };
+}
+
 export function createEmptyPlannerState(): PlannerState {
   const nowIso = new Date().toISOString();
 
@@ -321,7 +348,7 @@ export function getTaskSeriesTasks(tasks: PlannerTask[], taskId: string) {
   return sortPlannerTasks(tasks).filter((task) => getTaskSeriesId(task) === seriesId);
 }
 
-function getTaskRecurrenceTasks(
+export function getTaskLinkedTasks(
   tasks: PlannerTask[],
   taskId: string,
 ) {
@@ -342,6 +369,29 @@ function getTaskRecurrenceTasks(
 
 export function getTaskSeriesAssignees(task: PlannerTask) {
   return getTaskFallbackAssignees(task);
+}
+
+export function getTaskPrimaryTask(tasks: PlannerTask[], taskId: string) {
+  const linkedTasks = getTaskLinkedTasks(tasks, taskId);
+  if (linkedTasks.length === 0) {
+    return null;
+  }
+
+  const bankTask = linkedTasks.find((task) => task.status === "bank");
+  if (bankTask) {
+    return bankTask;
+  }
+
+  return [...linkedTasks].sort((left, right) => {
+    const leftDate = left.date || "9999-99-99";
+    const rightDate = right.date || "9999-99-99";
+
+    if (leftDate !== rightDate) {
+      return leftDate.localeCompare(rightDate);
+    }
+
+    return left.createdAt.localeCompare(right.createdAt);
+  })[0];
 }
 
 export function sortPlannerTasks(tasks: PlannerTask[]) {
@@ -421,7 +471,7 @@ function buildCollapsedBankSeriesTask(
     seriesAssignees: assignees,
     progressStatus: getTaskProgressStatus(representativeTask),
     assignee: assignees.length === 1 ? assignees[0] : null,
-    date: null,
+    date: sourceTask.date || representativeTask.date || null,
     status: "bank" as const,
     group: targetGroup,
     updatedAt,
@@ -473,16 +523,29 @@ export function moveTaskToContainer(
   }
 
   const nowIso = new Date().toISOString();
+  const linkedTasks = getTaskLinkedTasks(tasks, taskId);
   const seriesTasks = getTaskSeriesTasks(tasks, taskId);
   const movedSeriesId = getTaskSeriesId(sourceTask);
-  const tasksToMove = seriesTasks.length > 0 ? seriesTasks : [sourceTask];
+  const movedRecurrenceGroupId = getTaskRecurrenceGroupId(sourceTask);
+  const tasksToMove = movedRecurrenceGroupId
+    ? linkedTasks
+    : seriesTasks.length > 0
+      ? seriesTasks
+      : [sourceTask];
+  const linkedTaskIds = new Set(tasksToMove.map((task) => task.id));
   const remainingTasks = tasks
-    .filter((task) => getTaskSeriesId(task) !== movedSeriesId)
+    .filter((task) => !linkedTaskIds.has(task.id))
     .map((task) => ({ ...task }));
   const containerMap = buildContainerMap(remainingTasks);
   const movedTasksByContainer = new Map<string, PlannerTask[]>();
   const seriesAssignees = getSeriesParticipantIds(tasksToMove);
-  const recurrence = getTaskRecurrence(sourceTask);
+  const recurrence = moveRecurrenceToDate(
+    getTaskRecurrence(sourceTask),
+    targetSpec.date || sourceTask.date || null,
+  );
+  const familyRecurrenceGroupId =
+    movedRecurrenceGroupId ||
+    (isRecurringTask(recurrence) || seriesAssignees.length > 1 ? makeRecurrenceGroupId() : null);
 
   if (targetSpec.kind === "bank") {
     const movedTask = buildCollapsedBankSeriesTask(
@@ -491,6 +554,9 @@ export function moveTaskToContainer(
       targetSpec.group,
       nowIso,
     );
+    movedTask.recurrenceGroupId = familyRecurrenceGroupId;
+    movedTask.recurrence = recurrence;
+    movedTask.seriesAssignees = seriesAssignees;
     const containerId = getTaskContainerId(movedTask);
     movedTasksByContainer.set(containerId, [movedTask]);
   } else {
@@ -501,33 +567,46 @@ export function moveTaskToContainer(
           ? [targetSpec.assignee]
           : [];
     const occurrenceDates =
-      sourceTask.status === "bank" &&
-      isRecurringTask(recurrence) &&
-      targetSpec.date
+      isRecurringTask(recurrence) && targetSpec.date
         ? getRecurringDates(targetSpec.date, recurrence, currentMonth)
         : targetSpec.date
           ? [targetSpec.date]
           : [];
     const recurrenceGroupId =
-      occurrenceDates.length > 1
-        ? getTaskRecurrenceGroupId(sourceTask) || makeRecurrenceGroupId()
-        : getTaskRecurrenceGroupId(sourceTask);
+      occurrenceDates.length > 1 || seriesAssignees.length > 1
+        ? familyRecurrenceGroupId
+        : movedRecurrenceGroupId;
+    const previousSeriesIdByDate = new Map<string, string>();
+
+    tasksToMove.forEach((task) => {
+      if (task.status !== "calendar" || !task.date || previousSeriesIdByDate.has(task.date)) {
+        return;
+      }
+
+      previousSeriesIdByDate.set(task.date, getTaskSeriesId(task));
+    });
 
     occurrenceDates.forEach((occurrenceDate, occurrenceIndex) => {
       const occurrenceSeriesId =
-        occurrenceIndex === 0 ? movedSeriesId : makeSeriesId();
+        previousSeriesIdByDate.get(occurrenceDate) ||
+        (occurrenceIndex === 0 ? movedSeriesId : makeSeriesId());
 
       calendarAssignees.forEach((assignee, index) => {
         const previousSibling =
-          occurrenceIndex === 0
-            ? tasksToMove.find((task) => task.assignee === assignee) ||
-              (index === 0 ? sourceTask : null)
-            : null;
+          tasksToMove.find(
+            (task) =>
+              task.status === "calendar" &&
+              task.assignee === assignee &&
+              task.date === occurrenceDate,
+          ) ||
+          (occurrenceIndex === 0 && index === 0 ? sourceTask : null);
         const baseTask = previousSibling || sourceTask;
         const movedTask = patchTaskWithContainer(
           {
             ...baseTask,
-            id: previousSibling?.id || (occurrenceIndex === 0 && index === 0 ? sourceTask.id : makeTaskId()),
+            id:
+              previousSibling?.id ||
+              (occurrenceIndex === 0 && index === 0 ? sourceTask.id : makeTaskId()),
             updatedAt: nowIso,
             seriesId: occurrenceSeriesId,
             seriesAssignees:
@@ -570,7 +649,7 @@ export function deletePlannerTask(tasks: PlannerTask[], taskId: string) {
   }
 
   const deletingRecurrenceGroupId = getTaskRecurrenceGroupId(sourceTask);
-  const tasksToDelete = getTaskRecurrenceTasks(tasks, taskId);
+  const tasksToDelete = getTaskLinkedTasks(tasks, taskId);
   const deletingTaskIds = new Set(tasksToDelete.map((task) => task.id));
 
   return normalizeTaskOrders(
@@ -593,10 +672,15 @@ export function updateTaskSeriesProgressStatus(
   }
 
   const nowIso = new Date().toISOString();
-  const updatingSeriesId = getTaskSeriesId(sourceTask);
+  const updatingRecurrenceGroupId = getTaskRecurrenceGroupId(sourceTask);
+  const updatingTaskIds = getLinkedTaskIds(tasks, taskId);
 
-  return tasks.map((task) =>
-    getTaskSeriesId(task) === updatingSeriesId
+  return tasks.map((task) => {
+    const shouldUpdate = updatingRecurrenceGroupId
+      ? getTaskRecurrenceGroupId(task) === updatingRecurrenceGroupId
+      : updatingTaskIds.has(task.id);
+
+    return shouldUpdate
       ? {
           ...task,
           seriesId: getTaskSeriesId(task),
@@ -605,8 +689,8 @@ export function updateTaskSeriesProgressStatus(
           progressStatus,
           updatedAt: nowIso,
         }
-      : task,
-  );
+      : task;
+  });
 }
 
 export function cycleTaskProgressStatus(status: TaskProgressStatus) {
@@ -664,7 +748,6 @@ export function buildTaskInput(values: TaskFormValues): PlannerTaskInput {
   const hoursValue = Number(values.hours);
   const assignees = uniqueParticipantIds(values.assignees);
   const date = values.date || null;
-  const status = assignees.length > 0 && date ? "calendar" : values.status;
 
   return {
     title: values.title.trim(),
@@ -674,7 +757,7 @@ export function buildTaskInput(values: TaskFormValues): PlannerTaskInput {
     group: values.group,
     assignees,
     date,
-    status,
+    status: values.status,
     recurrence: normalizeTaskRecurrence(values.recurrence, date),
   };
 }
@@ -692,9 +775,10 @@ export function upsertPlannerTask(
   }
 
   const recurrence = normalizeTaskRecurrence(input.recurrence, input.date);
-  const previousSeriesId = previousTask ? getTaskSeriesId(previousTask) : makeSeriesId();
-  const previousRecurrenceGroupId = previousTask ? getTaskRecurrenceGroupId(previousTask) : null;
-  const previousSeriesTasks = previousTask ? getTaskRecurrenceTasks(tasks, previousTask.id) : [];
+  const previousPrimaryTask = previousTask ? getTaskPrimaryTask(tasks, previousTask.id) : null;
+  const previousSeriesId = previousPrimaryTask ? getTaskSeriesId(previousPrimaryTask) : makeSeriesId();
+  const previousRecurrenceGroupId = previousPrimaryTask ? getTaskRecurrenceGroupId(previousPrimaryTask) : null;
+  const previousSeriesTasks = previousTask ? getTaskLinkedTasks(tasks, previousTask.id) : [];
   const withoutPreviousSeries = previousTask
     ? tasks
         .filter((task) =>
@@ -707,23 +791,56 @@ export function upsertPlannerTask(
 
   const scheduleToCalendars = shouldScheduleTask(input);
   const seriesAssignees = uniqueParticipantIds(input.assignees);
-  const assignees = scheduleToCalendars
-    ? seriesAssignees
-    : [seriesAssignees.length === 1 ? seriesAssignees[0] : null];
+  const assignees = seriesAssignees;
   const recurrenceGroupId =
-    scheduleToCalendars && isRecurringTask(recurrence)
-      ? previousRecurrenceGroupId || makeRecurrenceGroupId()
-      : null;
+    previousRecurrenceGroupId ||
+    (isRecurringTask(recurrence) || assignees.length > 1 ? makeRecurrenceGroupId() : null);
+
+  if (!scheduleToCalendars) {
+    const nextTask: PlannerTask = {
+      id: previousPrimaryTask?.status === "bank" ? previousPrimaryTask.id : previousTask?.id || makeTaskId(),
+      seriesId: previousPrimaryTask ? getTaskSeriesId(previousPrimaryTask) : makeSeriesId(),
+      seriesAssignees,
+      recurrenceGroupId,
+      recurrence,
+      progressStatus: previousPrimaryTask?.progressStatus || previousTask?.progressStatus || "in-progress",
+      title: input.title,
+      description: input.description,
+      link: input.link,
+      hours: input.hours,
+      group: input.group,
+      assignee: seriesAssignees.length === 1 ? seriesAssignees[0] : null,
+      date: input.date,
+      status: "bank",
+      order: 0,
+      createdAt: previousPrimaryTask?.createdAt || previousTask?.createdAt || nowIso,
+      updatedAt: nowIso,
+    };
+
+    const targetTasks = getTasksForContainer(withoutPreviousSeries, getTaskContainerSpec(nextTask));
+    const sameContainer =
+      previousPrimaryTask &&
+      getTaskContainerId(previousPrimaryTask) === getTaskContainerId(nextTask);
+
+    return normalizeTaskOrders([
+      ...withoutPreviousSeries,
+      {
+        ...nextTask,
+        order: sameContainer && previousPrimaryTask ? previousPrimaryTask.order : targetTasks.length,
+      },
+    ]);
+  }
+
   const occurrenceDates =
-    scheduleToCalendars && input.date
+    input.date
       ? isRecurringTask(recurrence)
         ? getRecurringDates(input.date, recurrence, currentMonth)
         : [input.date]
-      : [null];
+      : [];
   const previousSeriesIdByDate = new Map<string, string>();
 
   previousSeriesTasks.forEach((task) => {
-    if (!task.date || previousSeriesIdByDate.has(task.date)) {
+    if (task.status !== "calendar" || !task.date || previousSeriesIdByDate.has(task.date)) {
       return;
     }
     previousSeriesIdByDate.set(task.date, getTaskSeriesId(task));
@@ -734,14 +851,19 @@ export function upsertPlannerTask(
       occurrenceDate && previousSeriesIdByDate.get(occurrenceDate)
         ? previousSeriesIdByDate.get(occurrenceDate)!
         : occurrenceDate
-          ? makeSeriesId()
+          ? occurrenceDates.length === 1 && previousPrimaryTask
+            ? getTaskSeriesId(previousPrimaryTask)
+            : makeSeriesId()
           : previousSeriesId;
 
     return assignees.map((assignee, index) => {
       const previousSibling =
         previousSeriesTasks.find(
-          (task) => task.assignee === assignee && (task.date || null) === occurrenceDate,
-        ) || (!occurrenceDate && index === 0 ? previousTask : null);
+          (task) =>
+            task.status === "calendar" &&
+            task.assignee === assignee &&
+            (task.date || null) === occurrenceDate,
+        ) || (occurrenceDates.length === 1 && index === 0 ? previousTask : null);
       const createdAt = previousSibling?.createdAt || nowIso;
       const nextTask: PlannerTask = {
         id: previousSibling?.id || makeTaskId(),

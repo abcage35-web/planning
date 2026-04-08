@@ -62,8 +62,9 @@ import {
   getPlannerSettings,
   getRecurrenceSummary,
   getScheduledTaskCount,
+  getTaskLinkedTasks,
+  getTaskPrimaryTask,
   getTaskSeriesAssignees,
-  getTaskSeriesTasks,
   getTaskHoursForParticipant,
   getTasksForContainer,
   isDateWithinCurrentMonth,
@@ -135,11 +136,11 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
   const bankTaskCount = useMemo(() => getBankTaskCount(sortedTasks), [sortedTasks]);
   const scheduledTaskCount = useMemo(() => getScheduledTaskCount(sortedTasks), [sortedTasks]);
   const selectedTask = useMemo(
-    () => sortedTasks.find((task) => task.id === dialogState.taskId) || null,
+    () => (dialogState.taskId ? getTaskPrimaryTask(sortedTasks, dialogState.taskId) : null),
     [dialogState.taskId, sortedTasks],
   );
   const selectedTaskSeries = useMemo(
-    () => (dialogState.taskId ? getTaskSeriesTasks(sortedTasks, dialogState.taskId) : []),
+    () => (dialogState.taskId ? getTaskLinkedTasks(sortedTasks, dialogState.taskId) : []),
     [dialogState.taskId, sortedTasks],
   );
   const selectedTaskSeriesAssigneeNames = useMemo(
@@ -153,7 +154,10 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
       PARTICIPANTS.filter((participant) => visibleParticipantIds.includes(participant.id)),
     [visibleParticipantIds],
   );
-  const automaticCalendarPlacement = formValues.assignees.length > 0 && Boolean(formValues.date);
+  const automaticCalendarPlacement =
+    formValues.status === "calendar" &&
+    formValues.assignees.length > 0 &&
+    Boolean(formValues.date);
   const selectedAssigneeNames = useMemo(
     () => getParticipantNames(formValues.assignees),
     [formValues.assignees],
@@ -328,11 +332,12 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
   }, []);
 
   const openEditDialog = useCallback((task: PlannerTask) => {
-    setFormValues(createTaskFormValues(task));
+    const primaryTask = getTaskPrimaryTask(sortedTasks, task.id) || task;
+    setFormValues(createTaskFormValues(primaryTask));
     setFormError(null);
     setDeleteConfirmOpen(false);
     setDialogState({ open: true, mode: "edit", taskId: task.id });
-  }, []);
+  }, [sortedTasks]);
 
   const handleDialogOpenChange = useCallback((open: boolean) => {
     setDialogState((current) => ({ ...current, open }));
@@ -509,7 +514,7 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
       {
         action: "clone",
         message:
-          input.assignees.length > 1 && input.date
+          input.status === "calendar" && input.assignees.length > 1 && input.date
             ? `Клон задачи создан на ${input.assignees.length} календарях.`
             : "Задача клонирована",
         taskId: selectedTask.id,
@@ -565,7 +570,7 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
 
     const editingTaskId = dialogState.taskId;
     const saveMessage =
-      input.assignees.length > 1 && input.date
+      input.status === "calendar" && input.assignees.length > 1 && input.date
         ? `Задача размещена на ${input.assignees.length} календарях.`
         : dialogState.mode === "create"
           ? "Новая задача создана"
@@ -902,7 +907,7 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
                     )}
                   >
                     {automaticCalendarPlacement
-                      ? "Автоперенос в календари"
+                      ? "Готово к размещению в календаре"
                       : "Сохранение в банк"}
                   </Badge>
                   {selectedTaskSeries.length > 1 ? (
@@ -1331,8 +1336,9 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
                       </button>
                     </div>
                     <p className="mt-3 text-xs leading-5 text-slate-500">
-                      Если задать исполнителей и дату, задача автоматически уйдет в
-                      календари даже без ручного переключения.
+                      В банке можно заранее заполнить дату, повторение и исполнителей.
+                      Перенос в календари происходит только когда вы явно выбираете
+                      размещение или перетаскиваете задачу в нужный день.
                     </p>
                   </div>
 
@@ -1344,7 +1350,9 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
                       <p>
                         {automaticCalendarPlacement
                           ? `После сохранения задача появится в ${formValues.assignees.length} календарях на дату ${getDisplayDay(formValues.date)}.`
-                          : "После сохранения задача останется в банке задач и будет готова к переносу."}
+                          : formValues.date
+                            ? `После сохранения задача останется в банке с датой ${getDisplayDay(formValues.date)} и будет готова к переносу.`
+                            : "После сохранения задача останется в банке задач и будет готова к переносу."}
                       </p>
                       <p>
                         {selectedAssigneeNames.length > 0
@@ -1373,7 +1381,7 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
                     </p>
                     <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
                       <p>Название обязательно всегда. Остальные поля можно заполнить позже.</p>
-                      <p>Для размещения в календарях нужны исполнители и дата текущего месяца.</p>
+                      <p>Для размещения в календарях нужны исполнители и дата текущего месяца. В банке дату можно хранить как преднастройку.</p>
                       <p>Связанные задачи синхронизируются между всеми выбранными исполнителями.</p>
                     </div>
                   </div>

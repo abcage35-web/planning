@@ -243,10 +243,10 @@ function collapseBankSeriesTasks(tasksRaw) {
 
   for (const task of tasks) {
     if (task?.status === "bank") {
-      const seriesId = getSeriesId(task);
-      const list = bankSeriesMap.get(seriesId) || [];
+      const familyId = toSafeString(task?.recurrenceGroupId, 120) || getSeriesId(task);
+      const list = bankSeriesMap.get(familyId) || [];
       list.push(task);
-      bankSeriesMap.set(seriesId, list);
+      bankSeriesMap.set(familyId, list);
       continue;
     }
 
@@ -268,7 +268,7 @@ function collapseBankSeriesTasks(tasksRaw) {
       seriesId: getSeriesId(representativeTask),
       seriesAssignees: uniqueAssignees,
       assignee: uniqueAssignees.length === 1 ? uniqueAssignees[0] : null,
-      date: null,
+      date: representativeTask.date || null,
       status: "bank",
     });
   }
