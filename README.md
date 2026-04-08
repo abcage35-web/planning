@@ -1,122 +1,83 @@
-# WB Dashboard (Media Plan)
+# Planning
 
-Тест синхронизации с GitHub: 23 февраля 2026.
+`Planning` is a standalone task planner with a task bank, three personal calendars for the current month, and drag-and-drop scheduling.
 
-Локальный интерфейс разделён на 2 независимых проекта:
-- `cards/` — дашборд карточек WB;
-- `ab-tests/` — дашборд AB‑тестов обложек.
+The repository is no longer described as `mp_cards` or `Media Plan`. The current product is the planner available at `/planner/`.
 
-Корневой `index.html` теперь только роутер-свитчер между этими проектами.
+## What The App Does
 
-## Что где находится
+- shows three monthly calendars for `Саша Некрасов`, `Саша Манохин`, and `Антон Бобер`
+- keeps a task bank with grouped task cards
+- supports drag-and-drop between the bank and calendars
+- allows task ordering inside groups
+- supports multi-assignee placement for the same task
+- persists state to local files so data survives reloads and local server restarts
 
-- `cards/index.html`, `cards/app.css`, `cards/app.js`, `cards/services/*`
-- `ab-tests/index.html`, `ab-tests/app.css`, `ab-tests/app.js`, `ab-tests/services/*`
-- `functions/api/*` и `cloudflare/d1/*` остаются общими для backend/API.
+## Task Model
 
-## Карточки (`cards/`)
+Each task can contain:
 
-Функционал мониторинга карточек Wildberries:
-- загрузка карточек по артикулам вручную/списком;
-- загрузка всех товаров по заранее заданным продавцам (кабинетам);
-- автоматическое определение кабинета по `supplierId`;
-- проверка наполненности карточки + слайды;
-- фильтры по каждой колонке;
-- сводка проблем (`Нет` по рекомендациям, ричу, видео, автоплею, тегам);
-- сохранение состояния в `localStorage` + облачная синхронизация через Cloudflare D1 (`/api/state`).
-- backend-авторизация через Cloudflare Pages Functions + D1 sessions (`/api/auth/*`).
-- плановое теневое обновление всех строк в `00:00` и `12:00` по Москве (источник `system` в истории).
+- title
+- hours
+- description
+- link
+- group
+- one or more assignees
+- date
 
-## Запуск
+Available groups:
+
+- Плановые задачи
+- Новые задачи
+- Проектные задачи
+- Созвоны
+- Не определено
+
+## Stack
+
+- React 18
+- TypeScript
+- Vite 6
+- Tailwind CSS v4
+- `react-dnd` for drag-and-drop
+- local file persistence through `functions/api/planner-state.js`
+
+## Local Run
 
 ```bash
-cd '/Users/looqich/Documents/Media Plan'
-python3 -m http.server 4173
+npm install
+npm run dev
 ```
 
-Открыть:
-- `http://127.0.0.1:4173/` — выбор проекта;
-- `http://127.0.0.1:4173/cards/` — карточки;
-- `http://127.0.0.1:4173/ab-tests/` — AB‑тесты.
+Open:
 
-## Облачное хранение (Cloudflare D1)
+- `http://127.0.0.1:5173/planner/`
 
-В проект добавлены:
-- API-функция: `functions/api/state.js` (`GET/PUT /api/state`);
-- API-функция экспорта: `functions/api/state-export.js` (`GET /api/state-export?key=...`, CSV);
-- API-функция rollback: `functions/api/state-rollback.js` (`POST /api/state-rollback`, admin only);
-- API-функции авторизации: `functions/api/auth/login.js`, `functions/api/auth/me.js`, `functions/api/auth/logout.js`;
-- SQL-схема D1: `cloudflare/d1/schema.sql`.
+## Persistence
 
-Архитектура хранения в D1:
-- `dashboard_rows_current` — текущее состояние по каждой строке товара (1 товар = 1 строка);
-- `dashboard_row_versions` — версионирование строк для отката;
-- `dashboard_row_logs` — логи обновлений по строкам;
-- `dashboard_problem_snapshots` — история срезов проблем для графика;
-- `dashboard_state_meta` — метаданные UI-состояния без тяжелого массива `rows`;
-- `dashboard_save_events` — события сохранения (включая `actor_ip`).
+Planner data is stored in:
 
-Чтобы данные не пропадали после очистки браузера:
+- `storage/planner-state.json`
+- `storage/planner-state-log.ndjson`
 
-1. В Cloudflare создайте D1 базу (например `wb-dashboard-db`).
-2. Выполните SQL из `cloudflare/d1/schema.sql` в этой базе.
-   Важно: схема теперь включает таблицы `users` и `sessions`.
-3. В Pages-проекте откройте `Settings -> Functions -> D1 bindings`.
-4. Добавьте binding:
-   - `Variable name`: `DB`
-   - `D1 database`: ваша база `wb-dashboard-db`
-5. (Опционально) Добавьте переменные окружения:
-   - `AUTH_COOKIE_NAME` (по умолчанию `mp_session`);
-   - `SESSION_TTL_SECONDS` (по умолчанию 604800 = 7 дней).
-6. Убедитесь, что проект деплоится через Pages из GitHub (не Direct Upload).
-7. Сделайте `git push` и дождитесь нового деплоя.
+These files are created and updated automatically while the local dev server is running.
 
-После этого приложение автоматически:
-- при старте пытается загрузить последнее состояние из D1;
-- при изменениях сохраняет state локально и отправляет его в D1.
+## Important Paths
 
-## Вход
+- `planner/index.html` — standalone planner entry
+- `src/planner-main.tsx` — standalone planner bootstrap
+- `src/app/pages/PlannerPage.tsx` — main planner page
+- `src/app/planner/*` — planner UI and drag-and-drop logic
+- `functions/api/planner-state.js` — file persistence API
 
-Предустановленные пользователи (создаются SQL-скриптом):
-- `user / user` (роль `user`);
-- `admin / admin 1` (роль `admin`).
+## Publish To GitHub
 
-Разница прав:
-- `admin`: может добавлять и удалять товары;
-- `user`: не может добавлять и удалять товары.
+This repo includes helper scripts for publishing to `abcage35-web/planning`:
 
-Локально (`python3 -m http.server`) API `/api/state` недоступен, поэтому работает fallback на `localStorage`.
+- `npm run publish:planning`
+- `npm run autopublish:planning:start`
+- `npm run autopublish:planning:stop`
 
-## Как пользоваться
+## Note About GitHub Description
 
-1. Нажмите `Обновить карточки продавцов`, чтобы подтянуть все товары из настроенных кабинетов.
-2. При необходимости добавьте отдельные артикулы вручную.
-3. Нажмите `Обновить карточки`, чтобы перезагрузить данные по текущим строкам.
-4. Используйте фильтры во второй строке заголовка таблицы.
-5. В колонке `Рекомендации` нажмите `Да (клик)`, чтобы открыть оверлей с деталями.
-
-## Настроенные кабинеты
-
-- Паша 1 — `233776`
-- Стас 1 — `372556`
-- Паша 2 — `250027557`
-- Стас 2 — `250067050`
-
-## Ограничения
-
-WB периодически ограничивает seller-каталог (429/x-pow), поэтому загрузка всех товаров продавца может зависеть от сети/браузера.
-
-Также публичные источники не гарантируют:
-- точное количество тегов в листинге;
-- полный состав блока рекомендаций.
-
-Плановый теневой апдейт работает только когда хотя бы одна вкладка приложения открыта.
-Во время него текущий UI не блокируется и не перерисовывается; изменения применяются после перезагрузки страницы.
-
-## Кэш изображений
-
-При запуске через `http://127.0.0.1:4173` включается Service Worker:
-- миниатюры WB кэшируются в браузере;
-- при повторных обновлениях и открытиях страницы изображения загружаются заметно быстрее.
-
-Если нужно очистить кэш изображений, можно открыть DevTools → Application → Storage → Clear site data.
+The text shown in the GitHub `About` block is separate from `README.md`. If that description still says `mp_cards`, it must be changed in the repository settings on GitHub.
