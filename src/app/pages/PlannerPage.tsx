@@ -686,257 +686,331 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
         </div>
 
         <Dialog open={dialogState.open} onOpenChange={handleDialogOpenChange}>
-          <DialogContent className="max-h-[calc(100vh-1.5rem)] gap-0 overflow-hidden border-white/80 bg-white/95 p-0 shadow-[0_40px_100px_-45px_rgba(15,23,42,0.65)] sm:max-w-5xl sm:grid-rows-[auto_minmax(0,1fr)_auto]">
-            <DialogHeader className="border-b border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(240,253,250,0.96),_rgba(239,246,255,0.96)_42%,_rgba(255,255,255,0.98)_100%)] px-7 py-6">
-              <DialogTitle className="text-2xl font-semibold text-slate-950">
-                {dialogState.mode === "create" ? "Новая задача" : "Настройки задачи"}
-              </DialogTitle>
-              <DialogDescription className="max-w-3xl text-sm leading-6 text-slate-600">
-                Заполните карточку задачи. Если выбрать исполнителей и дату, задача сразу
-                разместится на всех выбранных календарях.
-              </DialogDescription>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Badge variant="outline" className="border-white bg-white/90 text-slate-700">
-                  Текущий месяц: {monthLabel}
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "border-white bg-white/90 text-slate-700",
-                    automaticCalendarPlacement && "border-emerald-200 bg-emerald-50 text-emerald-700",
-                  )}
-                >
-                  {automaticCalendarPlacement ? "Автоперенос в календари" : "Сохранение в банк"}
-                </Badge>
+          <DialogContent className="max-h-[calc(100vh-1.25rem)] gap-0 overflow-hidden border-white/80 bg-white/95 p-0 shadow-[0_40px_100px_-45px_rgba(15,23,42,0.65)] sm:max-w-6xl sm:grid-rows-[auto_minmax(0,1fr)_auto]">
+            <DialogHeader className="border-b border-slate-200/80 bg-[radial-gradient(circle_at_top_left,_rgba(240,253,250,0.96),_rgba(239,246,255,0.96)_42%,_rgba(255,255,255,0.98)_100%)] px-6 py-5">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-2">
+                  <DialogTitle className="text-[1.85rem] font-semibold leading-none text-slate-950">
+                    {dialogState.mode === "create" ? "Новая задача" : "Настройки задачи"}
+                  </DialogTitle>
+                  <DialogDescription className="max-w-2xl text-sm leading-6 text-slate-600">
+                    Настройте карточку и быстро проверьте итог справа. Если выбрать
+                    исполнителей и дату, задача сразу разместится на всех выбранных
+                    календарях.
+                  </DialogDescription>
+                </div>
+
+                <div className="flex flex-wrap gap-2 lg:max-w-[360px] lg:justify-end">
+                  <Badge variant="outline" className="border-white bg-white/90 text-slate-700">
+                    Текущий месяц: {monthLabel}
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "border-white bg-white/90 text-slate-700",
+                      automaticCalendarPlacement &&
+                        "border-emerald-200 bg-emerald-50 text-emerald-700",
+                    )}
+                  >
+                    {automaticCalendarPlacement
+                      ? "Автоперенос в календари"
+                      : "Сохранение в банк"}
+                  </Badge>
+                  {selectedTaskSeries.length > 1 ? (
+                    <Badge
+                      variant="outline"
+                      className="border-sky-200 bg-sky-50 text-sky-700"
+                    >
+                      Связано: {selectedTaskSeries.length} копии
+                    </Badge>
+                  ) : null}
+                </div>
               </div>
             </DialogHeader>
 
             <div className="min-h-0 overflow-y-auto overscroll-contain">
-            <div className="grid gap-6 px-7 py-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="task-title">Название задачи</Label>
-                <Input
-                  id="task-title"
-                  value={formValues.title}
-                  onChange={(event) =>
-                    setFormValues((current) => ({ ...current, title: event.target.value }))
-                  }
-                  placeholder="Например, Подготовить отчет по проекту"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="task-hours">Время, часы</Label>
-                <Input
-                  id="task-hours"
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={formValues.hours}
-                  onChange={(event) =>
-                    setFormValues((current) => ({ ...current, hours: event.target.value }))
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Размещение</Label>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormValues((current) => ({
-                        ...current,
-                        status: "bank",
-                      }))
-                    }
-                    className={cn(
-                      "rounded-2xl border px-4 py-3 text-left transition-all",
-                      formValues.status === "bank"
-                        ? "border-slate-900 bg-slate-900 text-white shadow-[0_14px_32px_-20px_rgba(15,23,42,0.9)]"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                    )}
-                  >
-                    <div className="text-sm font-semibold">Банк задач</div>
-                    <div className="mt-1 text-xs opacity-80">
-                      Карточка остается слева до планирования.
+              <div className="grid gap-5 px-6 py-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="space-y-5">
+                  {formError ? (
+                    <div className="rounded-[22px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      {formError}
                     </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFormValues((current) => ({
-                        ...current,
-                        status: "calendar",
-                      }))
-                    }
-                    className={cn(
-                      "rounded-2xl border px-4 py-3 text-left transition-all",
-                      formValues.status === "calendar"
-                        ? "border-emerald-500 bg-emerald-500 text-white shadow-[0_14px_32px_-20px_rgba(16,185,129,0.9)]"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                    )}
-                  >
-                    <div className="text-sm font-semibold">В календари</div>
-                    <div className="mt-1 text-xs opacity-80">
-                      Требуются исполнители и дата внутри текущего месяца.
-                    </div>
-                  </button>
-                </div>
-                <p className="text-xs leading-5 text-slate-500">
-                  Если задать исполнителей и дату, задача автоматически уйдет в календари даже без
-                  ручного переключения размещения.
-                </p>
-              </div>
+                  ) : null}
 
-              <div className="space-y-2">
-                <Label>Группа</Label>
-                <div className="flex flex-wrap gap-2">
-                  {TASK_GROUPS.map((group) => (
-                    <button
-                      key={group.id}
-                      type="button"
-                      onClick={() =>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="task-title"
+                      className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                    >
+                      Название задачи
+                    </Label>
+                    <Input
+                      id="task-title"
+                      className="h-11 rounded-2xl border-slate-200 bg-white text-sm shadow-sm"
+                      value={formValues.title}
+                      onChange={(event) =>
+                        setFormValues((current) => ({ ...current, title: event.target.value }))
+                      }
+                      placeholder="Например, Подготовить отчет по проекту"
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-[148px_180px_minmax(0,1fr)]">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="task-hours"
+                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                      >
+                        Время, часы
+                      </Label>
+                      <Input
+                        id="task-hours"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        className="h-11 rounded-2xl border-slate-200 bg-white text-sm shadow-sm"
+                        value={formValues.hours}
+                        onChange={(event) =>
+                          setFormValues((current) => ({
+                            ...current,
+                            hours: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="task-date"
+                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                      >
+                        Дата
+                      </Label>
+                      <Input
+                        id="task-date"
+                        type="date"
+                        min={monthRange.min}
+                        max={monthRange.max}
+                        className="h-11 rounded-2xl border-slate-200 bg-white text-sm shadow-sm"
+                        value={formValues.date}
+                        onChange={(event) =>
+                          setFormValues((current) => ({
+                            ...current,
+                            date: event.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="task-link"
+                        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                      >
+                        Ссылка
+                      </Label>
+                      <Input
+                        id="task-link"
+                        type="url"
+                        className="h-11 rounded-2xl border-slate-200 bg-white text-sm shadow-sm"
+                        value={formValues.link}
+                        onChange={(event) =>
+                          setFormValues((current) => ({
+                            ...current,
+                            link: event.target.value,
+                          }))
+                        }
+                        placeholder="https://..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Группа
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {TASK_GROUPS.map((group) => (
+                        <button
+                          key={group.id}
+                          type="button"
+                          onClick={() =>
+                            setFormValues((current) => ({
+                              ...current,
+                              group: group.id,
+                            }))
+                          }
+                          className={cn(
+                            "rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
+                            formValues.group === group.id
+                              ? `${group.badgeClass} shadow-[0_10px_22px_-18px_rgba(15,23,42,0.45)]`
+                              : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-900",
+                          )}
+                        >
+                          {group.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Исполнители
+                      </Label>
+                      <span className="text-xs text-slate-400">
+                        {formValues.assignees.length > 0
+                          ? `${formValues.assignees.length} выбрано`
+                          : "Не выбраны"}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {PARTICIPANTS.map((participant) => {
+                        const selected = formValues.assignees.includes(participant.id);
+
+                        return (
+                          <button
+                            key={participant.id}
+                            type="button"
+                            onClick={() => toggleAssignee(participant.id)}
+                            className={cn(
+                              "rounded-full border px-4 py-2 text-sm font-medium transition-all",
+                              selected
+                                ? "border-slate-900 bg-slate-900 text-white shadow-[0_12px_28px_-18px_rgba(15,23,42,0.85)]"
+                                : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-900",
+                            )}
+                          >
+                            {participant.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs leading-5 text-slate-500">
+                      Можно выбрать сразу несколько человек. Если указана дата, задача
+                      создастся на календаре каждого выбранного исполнителя.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="task-description"
+                      className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+                    >
+                      Описание
+                    </Label>
+                    <Textarea
+                      id="task-description"
+                      className="min-h-[132px] rounded-[22px] border-slate-200 bg-white px-4 py-3 text-sm shadow-sm"
+                      value={formValues.description}
+                      onChange={(event) =>
                         setFormValues((current) => ({
                           ...current,
-                          group: group.id,
+                          description: event.target.value,
                         }))
                       }
-                      className={cn(
-                        "rounded-full border px-3 py-2 text-sm font-medium transition-all",
-                        formValues.group === group.id
-                          ? `${group.badgeClass} shadow-[0_10px_22px_-18px_rgba(15,23,42,0.45)]`
-                          : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-900",
-                      )}
-                    >
-                      {group.label}
-                    </button>
-                  ))}
+                      placeholder="Детали задачи, ссылки на материалы, ожидания по результату."
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-3 md:col-span-2">
-                <Label>Исполнители</Label>
-                <div className="flex flex-wrap gap-2">
-                  {PARTICIPANTS.map((participant) => {
-                    const selected = formValues.assignees.includes(participant.id);
-
-                    return (
+                <aside className="space-y-4 lg:sticky lg:top-0 lg:self-start">
+                  <div className="rounded-[24px] border border-slate-200 bg-white/90 p-4 shadow-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Размещение
+                    </p>
+                    <div className="mt-3 grid gap-2">
                       <button
-                        key={participant.id}
                         type="button"
-                        onClick={() => toggleAssignee(participant.id)}
+                        onClick={() =>
+                          setFormValues((current) => ({
+                            ...current,
+                            status: "bank",
+                          }))
+                        }
                         className={cn(
-                          "rounded-full border px-4 py-2 text-sm font-medium transition-all",
-                          selected
-                            ? "border-slate-900 bg-slate-900 text-white shadow-[0_12px_28px_-18px_rgba(15,23,42,0.85)]"
-                            : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-900",
+                          "rounded-[20px] border px-4 py-3 text-left transition-all",
+                          formValues.status === "bank"
+                            ? "border-slate-900 bg-slate-900 text-white shadow-[0_14px_32px_-20px_rgba(15,23,42,0.9)]"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
                         )}
                       >
-                        {participant.name}
+                        <div className="text-sm font-semibold">Банк задач</div>
+                        <div className="mt-1 text-xs opacity-80">
+                          Карточка остается слева до планирования.
+                        </div>
                       </button>
-                    );
-                  })}
-                </div>
-                <p className="text-xs leading-5 text-slate-500">
-                  Можно выбрать сразу несколько человек. Если указана дата, задача создастся на
-                  календаре каждого выбранного исполнителя.
-                </p>
-              </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormValues((current) => ({
+                            ...current,
+                            status: "calendar",
+                          }))
+                        }
+                        className={cn(
+                          "rounded-[20px] border px-4 py-3 text-left transition-all",
+                          formValues.status === "calendar"
+                            ? "border-emerald-500 bg-emerald-500 text-white shadow-[0_14px_32px_-20px_rgba(16,185,129,0.9)]"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                        )}
+                      >
+                        <div className="text-sm font-semibold">В календари</div>
+                        <div className="mt-1 text-xs opacity-80">
+                          Требуются исполнители и дата внутри текущего месяца.
+                        </div>
+                      </button>
+                    </div>
+                    <p className="mt-3 text-xs leading-5 text-slate-500">
+                      Если задать исполнителей и дату, задача автоматически уйдет в
+                      календари даже без ручного переключения.
+                    </p>
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="task-date">Дата</Label>
-                <Input
-                  id="task-date"
-                  type="date"
-                  min={monthRange.min}
-                  max={monthRange.max}
-                  value={formValues.date}
-                  onChange={(event) =>
-                    setFormValues((current) => ({ ...current, date: event.target.value }))
-                  }
-                />
-              </div>
+                  <div className="rounded-[24px] border border-slate-200 bg-slate-50/90 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Что произойдет
+                    </p>
+                    <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                      <p>
+                        {automaticCalendarPlacement
+                          ? `После сохранения задача появится в ${formValues.assignees.length} календарях на дату ${getDisplayDay(formValues.date)}.`
+                          : "После сохранения задача останется в банке задач и будет готова к переносу."}
+                      </p>
+                      <p>
+                        {selectedAssigneeNames.length > 0
+                          ? `Исполнители: ${selectedAssigneeNames.join(", ")}`
+                          : "Исполнители пока не выбраны."}
+                      </p>
+                      {selectedTask ? (
+                        <p>
+                          Сейчас:{" "}
+                          {selectedTask.status === "calendar"
+                            ? `${getParticipantName(selectedTask.assignee)} • ${
+                                selectedTask.date
+                                  ? getDisplayDay(selectedTask.date)
+                                  : "без даты"
+                              }`
+                            : "банк задач"}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
 
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="task-link">Ссылка</Label>
-                <Input
-                  id="task-link"
-                  type="url"
-                  value={formValues.link}
-                  onChange={(event) =>
-                    setFormValues((current) => ({ ...current, link: event.target.value }))
-                  }
-                  placeholder="https://..."
-                />
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="task-description">Описание</Label>
-                <Textarea
-                  id="task-description"
-                  value={formValues.description}
-                  onChange={(event) =>
-                    setFormValues((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                  placeholder="Детали задачи, ссылки на материалы, ожидания по результату."
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-3 px-7 pb-1 lg:grid-cols-2">
-              <div className="rounded-[28px] border border-slate-200 bg-slate-50/90 px-5 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Что произойдет
-                </p>
-                <div className="mt-3 space-y-2 text-sm text-slate-600">
-                  <p>
-                    {automaticCalendarPlacement
-                      ? `После сохранения задача появится в ${formValues.assignees.length} календарях на дату ${getDisplayDay(formValues.date)}.`
-                      : "После сохранения задача останется в банке задач и будет готова к переносу."}
-                  </p>
-                  <p>
-                    {selectedAssigneeNames.length > 0
-                      ? `Исполнители: ${selectedAssigneeNames.join(", ")}`
-                      : "Исполнители пока не выбраны."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                  Контроль заполнения
-                </p>
-                <div className="mt-3 space-y-2 text-sm text-slate-600">
-                  <p>Название обязательно всегда. Остальные поля можно заполнить позже.</p>
-                  <p>Для размещения в календарях нужны исполнители и дата текущего месяца.</p>
-                  <p>Группу можно менять позже drag-and-drop внутри банка и календаря.</p>
-                </div>
+                  <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Контроль заполнения
+                    </p>
+                    <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                      <p>Название обязательно всегда. Остальные поля можно заполнить позже.</p>
+                      <p>Для размещения в календарях нужны исполнители и дата текущего месяца.</p>
+                      <p>Связанные задачи синхронизируются между всеми выбранными исполнителями.</p>
+                    </div>
+                  </div>
+                </aside>
               </div>
             </div>
 
-            {selectedTask ? (
-              <div className="mx-7 rounded-[24px] border border-slate-200 bg-slate-50/80 px-5 py-4 text-sm text-slate-600">
-                Сейчас задача находится в контейнере:{" "}
-                {selectedTask.status === "calendar"
-                  ? `${getParticipantName(selectedTask.assignee)} • ${
-                      selectedTask.date ? getDisplayDay(selectedTask.date) : "без даты"
-                    }`
-                  : "банк задач"}
-              </div>
-            ) : null}
-
-            {formError ? (
-              <div className="mx-7 rounded-[24px] border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
-                {formError}
-              </div>
-            ) : null}
-            </div>
-
-            <DialogFooter className="border-t border-slate-200/80 px-7 py-5 sm:justify-between">
+            <DialogFooter className="border-t border-slate-200/80 px-6 py-4 sm:justify-between">
               <div className="flex items-center gap-2">
                 {dialogState.mode === "edit" ? (
                   <Button variant="destructive" className="rounded-2xl" onClick={handleDeleteTask}>
