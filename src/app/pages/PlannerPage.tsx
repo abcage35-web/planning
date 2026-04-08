@@ -324,8 +324,11 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [saveStatus]);
 
-  const openCreateDialog = useCallback(() => {
-    setFormValues(DEFAULT_TASK_FORM_VALUES);
+  const openCreateDialog = useCallback((groupId?: TaskGroupId) => {
+    setFormValues({
+      ...DEFAULT_TASK_FORM_VALUES,
+      group: groupId || DEFAULT_TASK_FORM_VALUES.group,
+    });
     setFormError(null);
     setDeleteConfirmOpen(false);
     setDialogState({ open: true, mode: "create" });
@@ -705,9 +708,9 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
               <CardContent className="px-4 py-4">
                 <div className="space-y-3">
                   {TASK_GROUPS.map((group) => (
-                    <TaskGroupSection
-                      key={group.id}
-                      title={group.label}
+                  <TaskGroupSection
+                    key={group.id}
+                    title={group.label}
                       groupId={group.id}
                       tasks={getTasksForContainer(sortedTasks, {
                         kind: "bank",
@@ -720,6 +723,7 @@ export function PlannerPage({ standalone = false }: PlannerPageProps) {
                       collapsible
                       collapsed={collapsedBankGroupIds.includes(group.id)}
                       onToggleCollapsed={toggleCollapsedBankGroup}
+                      onCreateTask={openCreateDialog}
                       onMoveTask={handleTaskMove}
                       onToggleTaskProgressStatus={handleTaskProgressStatusToggle}
                       onOpenTask={openEditDialog}

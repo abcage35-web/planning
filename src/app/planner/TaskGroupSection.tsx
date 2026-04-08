@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useDragLayer, useDrop } from "react-dnd";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 
 import { Badge } from "@/app/components/ui/badge";
 import { cn } from "@/app/components/ui/utils";
@@ -20,6 +20,7 @@ interface TaskGroupSectionProps {
   collapsible?: boolean;
   collapsed?: boolean;
   onToggleCollapsed?: (groupId: PlannerTask["group"]) => void;
+  onCreateTask?: (groupId: PlannerTask["group"]) => void;
   onMoveTask: (taskId: string, containerSpec: ContainerSpec, targetIndex: number) => void;
   onToggleTaskProgressStatus: (taskId: string, nextProgressStatus: TaskProgressStatus) => void;
   onOpenTask: (task: PlannerTask) => void;
@@ -39,6 +40,7 @@ export function TaskGroupSection({
   collapsible = false,
   collapsed = false,
   onToggleCollapsed,
+  onCreateTask,
   onMoveTask,
   onToggleTaskProgressStatus,
   onOpenTask,
@@ -101,6 +103,17 @@ export function TaskGroupSection({
           >
             {title}
           </Badge>
+          {variant === "bank" ? (
+            <button
+              type="button"
+              onClick={() => onCreateTask?.(groupId)}
+              className="inline-flex size-6 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
+              aria-label={`Создать задачу в группе ${title}`}
+              title={`Создать задачу в группе ${title}`}
+            >
+              <Plus className="size-3.5" />
+            </button>
+          ) : null}
           {collapsible ? (
             <button
               type="button"
